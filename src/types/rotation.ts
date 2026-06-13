@@ -1,0 +1,90 @@
+// ============================================================
+// rotation.ts
+// 定義「輸出軸（Rotation）」的核心資料結構。
+// 本專案最關鍵的設計決策：三條泳道在底層為「一維陣列」。
+// ============================================================
+
+import type { Block } from './block';
+import type { SlotIndex } from './character';
+
+/**
+ * RotationEntry：1D 輸出軸陣列中的單一元素。
+ *
+ * 【設計說明】
+ * 雖然視覺上有三條泳道（Swimlane），但底層資料結構是一個扁平的
+ * RotationEntry[]，每個元素除了攜帶 Block 資料，還記錄了它「屬於
+ * 哪條泳道（slotIndex）」，渲染時再依此分配到對應的泳道顯示。
+ *
+ * 排序規則：
+ *   Index(Block_n) = Index(Block_n-1) + 1
+ * 陣列的索引即代表時間先後，索引越小代表越早施放。
+ */
+export interface RotationEntry {
+  /**
+   * 此條目在 1D 陣列中的唯一識別，直接使用 Block.instanceId。
+   * 設計上刻意與 Block.instanceId 保持一致，方便 dnd-kit / VueDraggablePlus
+   * 使用 :key 綁定，也方便從陣列中快速查找、刪除。
+   */
+  id: string; // === block.instanceId
+
+  /**
+   * 此區塊所屬的泳道索引（0=上方角色, 1=中間角色, 2=下方角色）。
+   * 此值與 block.characterId 應保持同步，更改角色槽時需一併更新。
+   */
+  slotIndex: SlotIndex;
+
+  /**
+   * 完整的區塊實體資料。
+   * 採用「內嵌（Embed）」而非「外鍵（Foreign Key）」設計，
+   * 避免在渲染時需要跨 store 查找，提升效能。
+   */
+  block: Block;
+}
+
+/**
+ * RotationArray：整個輸出軸的核心資料型別。
+ * Pinia store 中的 `entries` 欄位即為此型別。
+ *
+ * 操作此陣列時，請務必使用 src/utils/arrayHelpers.ts 中的純函式，
+ * 不要在元件層直接進行 splice / push，確保邏輯集中且可測試。
+ */
+export type RotationArray = RotationEntry[];
+
+/**
+ * DragSource：描述拖曳動作的來源資訊。
+ * 用於 useBlockDrag composable 中判斷拖曳行為的類型。
+ */
+export type DragSourceType =
+  | 'sidebar-default'    // 從側邊欄「預設區塊」區域拖出
+  | 'sidebar-template'   // 從側邊欄「自訂模板」區域拖出
+  | 'rotation-instance'; // 從主時間軸拖動現有實體
+
+/**
+ * DragPayload：拖曳事件攜帶的完整資料。
+ * 在 VueDraggablePlus 的拖曳事件中，透過 data-* 屬性或 provide/inject 傳遞。
+ */
+export interface DragPayload {
+  /** 拖曳來源類型 */
+  sourceType: DragSourceType;
+
+  /**
+   * 來源區塊的識別碼。
+   * - 若 sourceType 為 'sidebar-default'    → DefaultBlock.id（如 'default-A'）
+   * - 若 sourceType 為 'sidebar-template'   → TemplateBlock.templateId（UUID）
+   * - 若 sourceType 為 'rotation-instance' → InstanceBlock.instanceId（UUID）
+   */
+  sourceId: string;
+
+  /**
+   * 目標槽位索引。
+   * 拖曳懸停在某條泳道上方時即時更新，放開時用於決定寫入哪個 slotIndex。
+   */
+  targetSlotIndex: SlotIndex | null;
+
+  /**
+   * 目標插入位置，代表插入在 1D 陣列的哪個索引之後。
+   * -1 代表插入在陣列最前方；
+   * entries.length - 1 代表插入在最後方（全局尾端吸附的預設值）。
+   */
+  targetInsertAfterIndex: number;
+}
