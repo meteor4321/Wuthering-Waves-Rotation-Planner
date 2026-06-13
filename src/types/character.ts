@@ -43,8 +43,8 @@ export type CharacterElement =
   | '冷凝'
   | '導電'
   | '湮滅'
-  | '繞射'
-  | '熔毀';
+  | '衍射'
+  | '熱熔';
 
 /**
  * 角色槽索引：主時間軸共有三條泳道，對應索引 0、1、2。
@@ -57,7 +57,7 @@ export type SlotIndex = 0 | 1 | 2;
  * 槽位可以是空的（null），代表尚未選擇角色。
  */
 export interface CharacterSlot {
-  /** 槽位索引，決定對應第幾條泳道 */
+  /** 槽位索引，決定對應第幾條輸出軸 */
   slotIndex: SlotIndex;
   /** 已選角色，null 代表尚未選擇 */
   character: Character | null;
