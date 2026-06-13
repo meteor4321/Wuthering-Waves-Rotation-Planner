@@ -1,0 +1,65 @@
+wuwa-rotation-tool/
+├── .gitignore
+├── index.html
+├── package.json
+├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── tailwind.config.ts
+├── postcss.config.js
+│
+├── public/
+│   └── favicon.ico
+│
+└── src/
+    ├── main.ts                        # Vue 應用程式掛載入口
+    ├── App.vue                        # 根元件，負責整體版面切割
+    │
+    ├── types/                         # 所有 TypeScript 介面與型別定義
+    │   ├── block.ts                   # Block、BlockTemplate 介面
+    │   ├── character.ts               # Character 介面與角色名單常數
+    │   └── rotation.ts                # RotationEntry（1D 陣列元素）介面
+    │
+    ├── constants/
+    │   ├── characters.ts              # 鳴潮角色名單（hardcode 預設清單）
+    │   └── defaultBlocks.ts           # 七個預設基礎招式區塊定義
+    │
+    ├── stores/                        # Pinia 狀態管理
+    │   ├── useRotationStore.ts        # 核心：1D 輸出軸陣列、拖曳排序邏輯
+    │   ├── useCharacterStore.ts       # 三個角色槽的選角狀態
+    │   └── useSidebarStore.ts         # 側邊欄自訂模板管理
+    │
+    ├── composables/                   # 可重複使用的組合函式
+    │   ├── useBlockDrag.ts            # 拖曳行為的共用邏輯（抬起、放置、刪除）
+    │   ├── useKeyboardShortcuts.ts    # 鍵盤快捷鍵（Delete/Ctrl+C/X/V/D）
+    │   └── useClipboard.ts            # 區塊剪貼簿（複製、貼上暫存）
+    │
+    ├── components/
+    │   ├── layout/
+    │   │   ├── AppHeader.vue          # 頂部標題列
+    │   │   └── AppLayout.vue          # 側邊欄 + 主軸的二欄版面容器
+    │   │
+    │   ├── sidebar/
+    │   │   ├── SidebarPanel.vue       # 側邊欄外殼（含兩個 field 切換）
+    │   │   ├── DefaultBlockField.vue  # 預設區塊展示區
+    │   │   ├── CustomBlockField.vue   # 自訂模板展示區（依角色分組）
+    │   │   └── SidebarBlock.vue       # 側邊欄中單一區塊的渲染元件
+    │   │
+    │   ├── rotation/
+    │   │   ├── RotationBoard.vue      # 主時間軸外殼（三條泳道容器）
+    │   │   ├── Swimlane.vue           # 單條輸出軸（含角色名稱標籤）
+    │   │   ├── RotationBlock.vue      # 主軸中單一區塊的渲染元件
+    │   │   └── DropIndicator.vue      # 拖曳落點發光吸附線元件
+    │   │
+    │   ├── character/
+    │   │   └── CharacterSelector.vue  # 角色選擇下拉選單（從角色名單挑選）
+    │   │
+    │   └── ui/
+    │       ├── ToastNotification.vue  # 右下角「已新增至模板庫」提示框
+    │       └── BlockChip.vue          # 區塊的純視覺呈現（顏色、文字、寬度）
+    │
+    └── utils/
+        ├── uuid.ts                    # UUID v4 生成工具函式
+        ├── deepClone.ts               # 深拷貝工具函式
+        └── arrayHelpers.ts            # 1D 陣列插入、移動、刪除的純函式
