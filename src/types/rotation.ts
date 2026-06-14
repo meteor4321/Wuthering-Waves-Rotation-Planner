@@ -16,20 +16,19 @@ import type { SlotIndex } from './character';
  * 哪條泳道（slotIndex）」，渲染時再依此分配到對應的泳道顯示。
  *
  * 排序規則：
- *   Index(Block_n) = Index(Block_n-1) + 1
+ * Index(Block_n) = Index(Block_n-1) + 1
  * 陣列的索引即代表時間先後，索引越小代表越早施放。
  */
 export interface RotationEntry {
   /**
-   * 此條目在 1D 陣列中的唯一識別，直接使用 Block.instanceId。
-   * 設計上刻意與 Block.instanceId 保持一致，方便 dnd-kit / VueDraggablePlus
-   * 使用 :key 綁定，也方便從陣列中快速查找、刪除。
+   * 此條目在 1D 陣列中的唯一識別，直接對應內部 Block.id。
+   * 方便 dnd-kit / VueDraggablePlus 使用 :key 綁定，也方便從陣列中快速查找、刪除。
    */
-  id: string; // === block.instanceId
+  id: string; // === block.id
 
   /**
    * 此區塊所屬的泳道索引（0=上方角色, 1=中間角色, 2=下方角色）。
-   * 此值與 block.characterId 應保持同步，更改角色槽時需一併更新。
+   * 此值與 block.characterId 的綁定狀態應保持一致。
    */
   slotIndex: SlotIndex;
 
@@ -68,10 +67,8 @@ export interface DragPayload {
   sourceType: DragSourceType;
 
   /**
-   * 來源區塊的識別碼。
-   * - 若 sourceType 為 'sidebar-default'    → DefaultBlock.id（如 'default-A'）
-   * - 若 sourceType 為 'sidebar-template'   → TemplateBlock.templateId（UUID）
-   * - 若 sourceType 為 'rotation-instance' → InstanceBlock.instanceId（UUID）
+   * 來源區塊的統一識別碼。
+   * 因底層已泛用化，不論來源為何，皆直接對應區塊介面中的泛用 `id`。
    */
   sourceId: string;
 
