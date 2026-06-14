@@ -20,7 +20,7 @@ export function insertEntryAfterIndex(
   afterIndex: number
 ): RotationEntry[] {
   const result = [...entries];
-  const insertAt = afterIndex === -1 ? 0 : afterIndex + 1;
+  const insertAt = afterIndex + 1;
   result.splice(insertAt, 0, newEntry);
   return result;
 }
