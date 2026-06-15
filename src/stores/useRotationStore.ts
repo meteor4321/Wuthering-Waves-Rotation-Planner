@@ -139,6 +139,44 @@ export const useRotationStore = defineStore('rotation', () => {
   }
 
   /**
+   * insertClonedBlocks：將一組已複製的區塊（通常來自剪貼簿）插入到主時間軸。
+   * 與 addFreeformBlock 不同，此方法會完整保留 originId 與 tags 的血統，
+   * 並且為每個區塊重新賦予全新的 UUID，防止重複貼上造成 ID 衝突。
+   *
+   * @param clonedEntries - 要插入的區塊條目陣列（需為深拷貝後的資料）
+   * @param startInsertAfterIndex - 插入的起始基準索引
+   */
+  function insertClonedBlocks(
+    clonedEntries: RotationEntry[],
+    startInsertAfterIndex: number
+  ): void {
+    let currentIndex = startInsertAfterIndex;
+    let currentEntries = [...entries.value]; // 暫存目前的陣列，準備批次更新
+
+    for (const entry of clonedEntries) {
+      // 為了確保重複貼上時不會有 ID 衝突，每次插入都必須重新生成 UUID
+      const newId = generateUUID();
+      const newEntry: RotationEntry = {
+        ...entry,
+        id: newId,
+        block: {
+          ...entry.block,
+          id: newId,
+        },
+      };
+
+      if (currentIndex >= currentEntries.length - 1) {
+        currentEntries = appendEntry(currentEntries, newEntry);
+      } else {
+        currentEntries = insertEntryAfterIndex(currentEntries, newEntry, currentIndex);
+      }
+      currentIndex++; // 確保下一個區塊排在剛剛插入的區塊後面
+    }
+
+    entries.value = currentEntries; // 一次性更新響應式狀態，觸發畫面渲染
+  }
+
+  /**
    * moveBlock：在主時間軸內移動一個區塊（排序操作）。
    * 允許跨泳道移動，跨泳道時會一併更新 slotIndex 與 characterId。
    */
@@ -222,6 +260,7 @@ export const useRotationStore = defineStore('rotation', () => {
     selectedEntries,
     instantiateBlock,
     addFreeformBlock,
+    insertClonedBlocks,
     moveBlock,
     deleteBlock,
     deleteSelectedBlocks,
