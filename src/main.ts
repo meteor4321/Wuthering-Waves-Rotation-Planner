@@ -1,5 +1,22 @@
-import { createApp } from 'vue'
-import './style.css'
-import App from './App.vue'
+// ============================================================
+// main.ts
+// Vue 應用程式的建立與掛載入口。
+// ============================================================
 
-createApp(App).mount('#app')
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+
+import App from './App.vue';
+
+// 全域樣式（Tailwind base/components/utilities + 自訂樣式）
+import './style.css';
+
+// 1. 建立 Vue 應用程式實例
+const app = createApp(App);
+
+// 2. 掛載 Pinia 狀態管理
+//    必須在 app.mount() 之前呼叫，確保所有元件都能存取 store
+app.use(createPinia());
+
+// 3. 掛載到 index.html 的 #app 容器
+app.mount('#app');
