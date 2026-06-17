@@ -14,6 +14,7 @@ import CharacterSelector from '@/components/character/CharacterSelector.vue'
 import ToastNotification from '@/components/ui/ToastNotification.vue'
 import { showToast } from '@/composables/useToast'
 import { WUWA_CHARACTERS } from '@/constants/characters'
+import SidebarPanel from '@/components/sidebar/SidebarPanel.vue'
 
 // 三條泳道暫時各自用一個本地 ref 模擬選角狀態（Phase 4 會改接 useCharacterStore）
 const slot1 = ref<string | null>(null)
@@ -32,12 +33,11 @@ function demoToast(): void {
     </template>
 
     <template #sidebar>
-      <div class="sidebar-demo">
-        <p class="sidebar-demo__label">角色槽（CharacterSelector 串接驗證）</p>
-        <CharacterSelector v-model="slot1" :options="WUWA_CHARACTERS" placeholder="角色 1" />
-        <CharacterSelector v-model="slot2" :options="WUWA_CHARACTERS" placeholder="角色 2" />
-        <CharacterSelector v-model="slot3" :options="WUWA_CHARACTERS" placeholder="角色 3" />
-      </div>
+      <SidebarPanel :slots="[
+        { slotIndex: 0, characterId: slot1, characterName: '角色 1', themeColor: null },
+        { slotIndex: 1, characterId: slot2, characterName: '今汐', themeColor: '#FBBF24' },
+        { slotIndex: 2, characterId: slot3, characterName: '角色 3', themeColor: null }
+      ]" />
     </template>
 
     <template #main>
