@@ -3,74 +3,117 @@
 // Swimlane.vue
 // 單一角色的橫向時間軸軌道。
 //
-// 版面結構：
-//   ┌──────────┬─────────────────────────────────────────────────┐
-//   │  Header  │  Track（可橫向捲動）                              │
-//   │  角色名稱 │  [RotationBlock] [RotationBlock] …  [tail: ＋]  │
-//   │  屬性色點 │                                                 │
-//   └──────────┴─────────────────────────────────────────────────┘
-//
-// 職責（Phase 4.2）：
-//   1. 左側 Header 固定顯示角色名稱（nameZh）與屬性色點（themeColor）。
-//   2. 右側 Track 橫向排列 RotationBlock，超出寬度時可橫向捲動。
-//   3. 接收父層（RotationBoard）已過濾的 entries，不自行存取 store。
-//   4. Track 尾端的「＋」按鈕呼叫 store.addFreeformBlock，
-//      並計算正確的插入位置（afterIndex），確保新區塊緊接在本泳道末尾。
-//   5. 點擊軌道背景清除全域選取。
-//
-// 嚴格限制：
-//   拖曳邏輯由後續 Phase 統一注入，本元件不處理。
+// Phase 4.3 異動：
+//   1. 引入 <VueDraggable> 包裹區塊序列，取代純 v-for 靜態渲染。
+//   2. 使用 v-model 綁定「本地緩衝陣列」localEntries（非 props.entries
+//      本身）：vue-draggable-plus 無論是否用 v-model，內部都會直接
+//      mutate 綁定的陣列物件，若直接綁定唯讀的 props.entries 會與
+//      Vue 的渲染追蹤脫鉤。localEntries 由本元件自己持有，放給套件
+//      自由操作；真正的真相來源仍是 useRotationStore——@add/@update
+//      會呼叫 useBlockDrag 的 handler 換算全域索引並寫回 store，
+//      待 store 更新、props.entries 重新計算後，watch 會立即把
+//      localEntries 校正回真相內容（詳見下方 localEntries 宣告處註解）。
+//   3. group / put（角色匹配）/ ghostClass 等規則統一由
+//      useBlockDrag.getRotationSortableOptions(slotIndex) 提供，
+//      本元件不重複定義拖曳規則。
 // ============================================================
 
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import RotationBlock from '@/components/rotation/RotationBlock.vue'
 import { useRotationStore } from '@/stores/useRotationStore'
+import { useBlockDrag, type SortableEventLike } from '@/composables/useBlockDrag'
 import type { Character } from '@/types/character'
 import type { RotationEntry } from '@/types/rotation'
 
 // ── Props ────────────────────────────────────────────────────
 
 interface Props {
-  /**
-   * 此泳道對應的角色。
-   * null 代表槽位尚未選角，Header 顯示佔位狀態。
-   */
+  /** 此泳道對應的角色。null 代表槽位尚未選角，Header 顯示佔位狀態。 */
   character: Character | null
-
-  /**
-   * 槽位索引（0 / 1 / 2），用於視覺上區分三條軌道的背景深淺。
-   */
+  /** 槽位索引（0 / 1 / 2） */
   slotIndex: 0 | 1 | 2
-
-  /**
-   * 此泳道的區塊序列（已由父層 RotationBoard 依 slotIndex 過濾完畢）。
-   * Phase 4.2 起為必填：靜態 STUB_ENTRIES 已移除。
-   */
+  /** 此泳道的區塊序列（已由父層 RotationBoard 依 slotIndex 過濾完畢） */
   entries: RotationEntry[]
 }
 
 const props = defineProps<Props>()
 
-// ── Store ────────────────────────────────────────────────────
+// ── Store / Composable ──────────────────────────────────────
 
 const rotationStore = useRotationStore()
-
-// ── Computed ─────────────────────────────────────────────────
+const {
+  dragState,
+  onRotationDragStart,
+  handleSidebarToLaneDrop,
+  handleSameLaneDrop,
+  handleDragEnd,
+  getRotationSortableOptions,
+} = useBlockDrag()
 
 /**
- * insertAfterIndex：「＋」按鈕觸發時，新區塊應插入的位置。
- *
- * 邏輯：
- *   從全域 1D 陣列末端往前掃，找到最後一個屬於本泳道（slotIndex）的 entry。
- *   取得其全局索引作為 afterIndex，讓新區塊緊接在本泳道現有序列之後。
- *
- *   若本泳道目前沒有任何 entry（空泳道），則回傳 entries.length - 1，
- *   等同呼叫 addFreeformBlock 的預設行為（追加至全局末尾）。
- *
- * 為何不直接用 props.entries.length - 1？
- *   props.entries 是過濾後的子陣列，其索引與全局 1D 陣列不同。
- *   必須在全局陣列中定位，才能讓 insertEntryAfterIndex 放到正確位置。
+ * localEntries：VueDraggable 實際操作的「本地緩衝陣列」。
  */
+const localEntries = ref<RotationEntry[]>([...props.entries])
+
+watch(
+  () => props.entries,
+  (newEntries) => {
+    localEntries.value = [...newEntries]
+  }
+)
+
+/**
+ * dragOptions：本泳道專屬的 SortableJS 設定（group/put/ghostClass...）。
+ * 直接透傳 useBlockDrag 集中管理的規則，本元件不重複定義。
+ */
+const dragOptions = computed(
+  (): Record<string, unknown> => getRotationSortableOptions(props.slotIndex)
+)
+
+/**
+ * getEntryFromDragEvent：依 SortableJS 事件的舊索引反查對應的 RotationEntry。
+ *
+ * 僅在「同泳道內拖曳起點（@start）」場景使用：
+ * 此時尚未發生任何 splice，localEntries 內容等同本泳道原始序列，
+ * 故 event.oldDraggableIndex（不計入不可拖曳元素時優先採用）
+ * 或 event.oldIndex 可直接對應 localEntries 的陣列索引，
+ * 不需要再做全域換算（全域換算交由 useBlockDrag 內部處理）。
+ */
+function getEntryFromDragEvent(event: SortableEventLike): RotationEntry | undefined {
+  const localIndex = event.oldDraggableIndex ?? event.oldIndex ?? -1
+  return localEntries.value[localIndex]
+}
+
+// ── 事件處理 ──────────────────────────────────────────────────
+
+/**
+ * handleDragStart：拖曳起點。
+ * 僅當拖曳來源為「本泳道既有區塊」時才需要記錄；
+ * 從側邊欄拖入的起點記錄已在 sidebar 欄位元件呼叫 onSidebarDragStart 完成。
+ */
+function handleDragStart(event: SortableEventLike): void {
+  const entry = getEntryFromDragEvent(event)
+  if (entry) onRotationDragStart(entry)
+}
+
+/** handleAdd：側邊欄拖入本泳道（onAdd） */
+function handleAdd(event: SortableEventLike): void {
+  handleSidebarToLaneDrop(event, props.slotIndex)
+}
+
+/** handleUpdate：本泳道內排序（onUpdate） */
+function handleUpdate(event: SortableEventLike): void {
+  handleSameLaneDrop(event, props.slotIndex)
+}
+
+/** handleEnd：拖曳結束的統一決策點（序列化 / 拖曳刪除 / 安全過關），交由 useBlockDrag 分流 */
+function handleEnd(): void {
+  handleDragEnd()
+}
+
+// ── 既有邏輯（Phase 4.2，未變動）──────────────────────────────
+
 const insertAfterIndex = computed<number>(() => {
   const globalEntries = rotationStore.entries
   for (let i = globalEntries.length - 1; i >= 0; i--) {
@@ -78,35 +121,20 @@ const insertAfterIndex = computed<number>(() => {
       return i
     }
   }
-  // 泳道為空：預設追加至全局末尾
   return globalEntries.length - 1
 })
 
-// ── Actions ──────────────────────────────────────────────────
-
-/**
- * handleAddBlock：點擊「＋」按鈕時，於本泳道末尾新增空白區塊。
- *
- * 傳入空字串 label，由使用者後續編輯。
- * color 使用角色主題色，保持視覺一致性。
- * 若 character 為 null（未選角），按鈕不應顯示，此處加一道保險。
- */
 function handleAddBlock(): void {
   if (!props.character) return
-
   rotationStore.addFreeformBlock(
-    '',                          // label：空白，等待使用者輸入
-    props.character.themeColor,  // color：角色主題色
-    props.slotIndex,             // slotIndex：本泳道
-    props.character.id,          // characterId：本泳道角色
-    insertAfterIndex.value,      // afterIndex：本泳道現有序列末尾
+    '',
+    props.character.themeColor,
+    props.slotIndex,
+    props.character.id,
+    insertAfterIndex.value,
   )
 }
 
-/**
- * handleTrackClick：點擊軌道背景時清除全域選取。
- * RotationBlock 內部已 stopPropagation，此事件僅在點擊空白處時觸發。
- */
 function handleTrackClick(): void {
   rotationStore.clearSelection()
 }
@@ -125,23 +153,18 @@ function handleTrackClick(): void {
       :style="character ? { '--lane-color': character.themeColor } : {}"
       aria-hidden="false"
     >
-      <!-- 頂端屬性色條（角色主題色） -->
       <div
         class="header__color-bar"
         :style="{ backgroundColor: character?.themeColor ?? 'rgba(255,255,255,0.15)' }"
         aria-hidden="true"
       />
 
-      <!-- 角色資訊 -->
       <div class="header__info">
-        <!-- 屬性色點 -->
         <span
           class="header__dot"
           :style="{ backgroundColor: character?.themeColor ?? 'rgba(255,255,255,0.25)' }"
           aria-hidden="true"
         />
-
-        <!-- 角色名稱 / 未選角佔位 -->
         <span
           class="header__name"
           :class="{ 'header__name--empty': !character }"
@@ -150,7 +173,6 @@ function handleTrackClick(): void {
         </span>
       </div>
 
-      <!-- 屬性標籤（有角色時顯示） -->
       <span
         v-if="character"
         class="header__element"
@@ -168,10 +190,8 @@ function handleTrackClick(): void {
       :aria-label="character ? `${character.nameZh} 的區塊序列` : '區塊序列'"
       @click="handleTrackClick"
     >
-      <!-- 軌道內層：撐開橫向寬度，允許捲動 -->
       <div class="track__inner">
 
-        <!-- 無角色且無區塊：整條軌道顯示 Drop 引導提示 -->
         <div
           v-if="!character"
           class="track__empty-hint"
@@ -180,22 +200,52 @@ function handleTrackClick(): void {
           請先選擇角色
         </div>
 
-        <!-- 有角色：渲染區塊序列（來自父層 RotationBoard 過濾後的 entries） -->
         <template v-else>
-          <RotationBlock
-            v-for="entry in entries"
-            :key="entry.id"
-            :entry-id="entry.id"
-            :label="entry.block.label"
-            :color="entry.block.color || character.themeColor"
-            role="listitem"
-          />
+          <!--
+            拖曳區塊序列：
+            - v-model 綁定本元件自己持有的 localEntries（緩衝陣列），
+              而非父層傳入的唯讀 props.entries，避免套件直接 mutate
+              非自有參考導致 VDOM/真實 DOM 脫鉤。
+            - item-key 對應 RotationEntry.id，確保 Vue keyed-diff
+              在 watch 校正 localEntries 後能正確比對、平滑過渡。
+            - class="track__draggable" 搭配 display: contents，
+              讓拖曳容器在版面上「消失」，子層 RotationBlock 直接
+              參與 .track__inner 的 flex 排列，不多一層盒模型。
+          -->
+          <VueDraggable
+            v-model="localEntries"
+            item-key="id"
+            tag="div"
+            class="track__draggable"
+            v-bind="dragOptions"
+            @start="handleDragStart"
+            @add="handleAdd"
+            @update="handleUpdate"
+            @end="handleEnd"
+          >
+            <RotationBlock
+              v-for="entry in localEntries"
+              :key="entry.id"
+              :entry-id="entry.id"
+              :label="entry.block.label"
+              :color="entry.block.color || character.themeColor"
+              role="listitem"
+            />
+          </VueDraggable>
 
           <!--
-            尾端區：
-            - 右側呼吸空間（固定 12px padding）
-            - 「＋」新增按鈕：僅在有角色時顯示，點擊呼叫 handleAddBlock
+            空泳道拖放提示：
+            僅在「正在拖曳中」且「本泳道目前沒有任何區塊」時顯示，
+            對應 SDD 預期落點提示：「如果該輸出軸為空，就在輸出軸上呈現提示效果」。
           -->
+          <div
+            v-if="localEntries.length === 0 && dragState.isDragging"
+            class="track__empty-dropzone"
+            aria-hidden="true"
+          >
+            拖放至此
+          </div>
+
           <div class="track__tail">
             <button
               class="track__add-btn"
@@ -218,28 +268,24 @@ function handleTrackClick(): void {
 <style scoped>
 /* ── CSS 自訂屬性 ────────────────────────────────────────── */
 .swimlane {
-  --header-width: 6rem;       /* 96px，固定 Header 寬度 */
-  --lane-height: 3.5rem;      /* 56px，單條泳道高度 */
-  --lane-color: rgba(255, 255, 255, 0.18); /* 預設色，由 :style 覆寫 */
-  --track-gap: 0.375rem;      /* 6px，Chip 間距 */
-  --track-px: 0.75rem;        /* 12px，軌道左右內距 */
+  --header-width: 6rem;
+  --lane-height: 3.5rem;
+  --lane-color: rgba(255, 255, 255, 0.18);
+  --track-gap: 0.375rem;
+  --track-px: 0.75rem;
 
-  /* ── 版面：水平分欄 ─── */
   display: flex;
   align-items: stretch;
   height: var(--lane-height);
   width: 100%;
 
-  /* ── 軌道間分隔線 ─── */
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* 最後一條泳道不顯示底部分隔線 */
 .swimlane:last-child {
   border-bottom: none;
 }
 
-/* 不同槽位的背景微差（製造深淺分層感） */
 .swimlane--slot-0 { background: rgba(255, 255, 255, 0.020); }
 .swimlane--slot-1 { background: rgba(255, 255, 255, 0.013); }
 .swimlane--slot-2 { background: rgba(255, 255, 255, 0.006); }
@@ -248,7 +294,7 @@ function handleTrackClick(): void {
    左側 Header
    ══════════════════════════════════════════════════════════ */
 .swimlane__header {
-  position: relative;         /* 供頂端色條 absolute 定位 */
+  position: relative;
   flex-shrink: 0;
   width: var(--header-width);
 
@@ -257,17 +303,14 @@ function handleTrackClick(): void {
   align-items: flex-start;
   justify-content: center;
   gap: 0.125rem;
-  padding: 0 0.625rem;        /* 10px 左右內距 */
+  padding: 0 0.625rem;
 
-  /* 右側細線與軌道分隔 */
   border-right: 1px solid rgba(255, 255, 255, 0.07);
 
-  /* 鎖定 Header，讓軌道水平捲動時它維持可見 */
   z-index: 1;
-  background: inherit;         /* 繼承泳道背景（slot 微差色） */
+  background: inherit;
 }
 
-/* 頂端角色屬性色條：絕對定位在 Header 最頂部 */
 .header__color-bar {
   position: absolute;
   top: 0;
@@ -277,16 +320,14 @@ function handleTrackClick(): void {
   transition: background-color 0.25s ease;
 }
 
-/* 角色名稱列（色點 + 文字橫排） */
 .header__info {
   display: flex;
   align-items: center;
-  gap: 0.3125rem;             /* 5px */
+  gap: 0.3125rem;
   width: 100%;
   overflow: hidden;
 }
 
-/* 屬性色點 */
 .header__dot {
   width: 6px;
   height: 6px;
@@ -295,9 +336,8 @@ function handleTrackClick(): void {
   transition: background-color 0.25s ease;
 }
 
-/* 角色名稱 */
 .header__name {
-  font-size: 0.75rem;         /* 12px */
+  font-size: 0.75rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.82);
   white-space: nowrap;
@@ -307,16 +347,14 @@ function handleTrackClick(): void {
   line-height: 1;
 }
 
-/* 未選角狀態：文字更淡 */
 .header__name--empty {
   color: rgba(255, 255, 255, 0.25);
   font-weight: 400;
   font-style: italic;
 }
 
-/* 屬性標籤（如「氣動」「冷凝」） */
 .header__element {
-  font-size: 0.5625rem;       /* 9px */
+  font-size: 0.5625rem;
   font-weight: 400;
   letter-spacing: 0.08em;
   opacity: 0.65;
@@ -329,49 +367,71 @@ function handleTrackClick(): void {
    ══════════════════════════════════════════════════════════ */
 .swimlane__track {
   flex: 1;
-  min-width: 0;               /* 防止 flex 子元素撐破父層 */
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
 
-  /* 隱藏捲軸但保留捲動能力（Webkit） */
-  scrollbar-width: none;      /* Firefox */
+  scrollbar-width: none;
 }
 
 .swimlane__track::-webkit-scrollbar {
-  display: none;              /* Chrome / Safari */
+  display: none;
 }
 
-/* 軌道內層：Flex 橫向排列，撐開寬度以啟用捲動 */
 .track__inner {
   display: flex;
   align-items: center;
   gap: var(--track-gap);
   height: 100%;
   padding: 0 var(--track-px);
-  width: max-content;         /* 讓內容自然撐開，觸發父層捲動 */
-  min-width: 100%;            /* 空白時仍佔滿可視寬度 */
+  width: max-content;
+  min-width: 100%;
 }
 
-/* 每個 Chip 的包裝（後續 Phase 在此掛拖曳事件） */
-/* Phase 4.2：RotationBlock 內部已使用 display: contents，
-   此包裝層已移除；樣式保留為後續 Phase 拖曳擴充的錨點。 */
+/*
+  拖曳容器：display: contents 讓 <VueDraggable> 的根節點在版面上「消失」，
+  子層 RotationBlock 直接參與 .track__inner 的 flex 排列。
+  注意：display: contents 元素本身無盒模型，因此 SortableJS 動態掛載的
+  ghostClass / chosenClass 若要顯示陰影或位移，必須作用在其「子層」
+  （見全域 src/style.css 的 .sortable-chosen > * 等選擇器），
+  不能直接對 .track__draggable 本身套用視覺樣式。
+*/
+.track__draggable {
+  display: contents;
+}
 
-/* 尾端容器：呼吸空間 + 「＋」新增按鈕 */
+/* 空泳道拖放提示 */
+.track__empty-dropzone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100% - 0.5rem);
+  margin: 0 0.25rem;
+  border: 1px dashed rgba(125, 211, 252, 0.45);
+  border-radius: 6px;
+  background: rgba(125, 211, 252, 0.06);
+  color: rgba(125, 211, 252, 0.65);
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  user-select: none;
+  pointer-events: none;
+}
+
 .track__tail {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  padding-left: 0.25rem;   /* 與最後一個 Chip 的間距 */
+  padding-left: 0.25rem;
   padding-right: var(--track-px);
 }
 
-/* 「＋」新增區塊按鈕 */
 .track__add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
 
-  width: 1.5rem;            /* 24px */
+  width: 1.5rem;
   height: 1.5rem;
   border-radius: 4px;
   border: 1px dashed rgba(255, 255, 255, 0.18);
@@ -382,7 +442,6 @@ function handleTrackClick(): void {
   line-height: 1;
   cursor: pointer;
 
-  /* 入場過渡 */
   transition:
     border-color 0.15s ease,
     color 0.15s ease,
@@ -400,16 +459,14 @@ function handleTrackClick(): void {
   transform: scale(0.93);
 }
 
-/* 未選角提示文字 */
 .track__empty-hint {
-  font-size: 0.6875rem;       /* 11px */
+  font-size: 0.6875rem;
   color: rgba(255, 255, 255, 0.18);
   letter-spacing: 0.05em;
   user-select: none;
   white-space: nowrap;
 }
 
-/* ── 無障礙：減少動畫 ────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .header__color-bar,
   .header__dot {

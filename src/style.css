@@ -115,3 +115,47 @@
     opacity: 1 !important;
   }
 }
+
+/* ── 吸附線 Ghost：佔位中的原始位置 ──────────────────────────
+   對應 SDD「預期落點提示」：顯示一條發光的吸附線，。
+*/
+.sortable-ghost {
+  position: relative;
+}
+
+.sortable-ghost > * {
+  visibility: hidden !important;
+}
+
+.sortable-ghost::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(125, 211, 252, 0.95);
+  box-shadow: 0 0 8px 1px rgba(125, 211, 252, 0.85);
+  pointer-events: none;
+}
+
+/* ── 抓取浮空 Chosen：放開前留在原位的視覺強化 ─────────────────
+   對應 SDD「抓取浮空」：scale 放大 + 較深陰影。
+*/
+.sortable-chosen > * {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.55);
+  filter: brightness(1.08);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  z-index: 10;
+  position: relative;
+}
+
+/* ── 拖曳分身 Drag：僅 forceFallback: true 時可見 ────────────── */
+.sortable-drag > * {
+  opacity: 0.92;
+  transform: scale(1.05);
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.6);
+  cursor: grabbing;
+}
