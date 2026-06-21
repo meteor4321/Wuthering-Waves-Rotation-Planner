@@ -1,37 +1,61 @@
 <script setup lang="ts">
-// ============================================================
 // DefaultBlockField.vue
 // 側邊欄「預設區塊」展示區。
-//
-// 職責：
-//   單純讀取常數並渲染七個基礎招式區塊，不處理任何拖曳或狀態邏輯。
-//   採橫向 flex-wrap 排列，超出側邊欄寬度時自動換行。
-//
-// 嚴格限制：
-//   本元件為靜態展示層，禁止引入任何 store 或 composable，
-//   拖曳能力將在 Phase 4 後續子階段由父層 SidebarPanel.vue 統一注入。
-// ============================================================
-
+// Phase 4.3：補上拖曳出去到主軸的功能。這份清單本身不能被排序、
+// 也不接受任何東西拖進來，只負責「被拖出去」。
+import { ref, computed } from 'vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { DEFAULT_BLOCKS } from '@/constants/defaultBlocks'
+import { useBlockDrag, DROP_ZONE_ATTRIBUTE } from '@/composables/useBlockDrag'
+import type { DefaultBlock } from '@/types/block'
+
+const { onSidebarDragStart, getSidebarSortableOptions } = useBlockDrag()
+
+// 套件要求綁定一個它能自行操作的陣列，不能直接綁常數。
+// 這份清單不會被排序也不接受拖入，所以不需要額外同步機制。
+const localBlocks = ref<DefaultBlock[]>([...DEFAULT_BLOCKS])
+
+const dragOptions = computed(() => getSidebarSortableOptions())
+
+// 拖去其他清單時，把原始區塊包成「看起來像主軸區塊」的暫時資料，
+// 避免畫面在正式寫入 store 前因為資料形狀不對而報錯。
+function cloneToPlaceholder(original: DefaultBlock) {
+  return {
+    id: original.id,
+    slotIndex: 0,
+    block: { ...original },
+  }
+}
+
+function handleDragStart(event: { oldIndex?: number }): void {
+  const block = localBlocks.value[event.oldIndex ?? -1]
+  if (block) onSidebarDragStart(block)
+}
 </script>
 
 <template>
   <section class="default-block-field">
-
-    <!-- 區塊標題 -->
     <h3 class="field-title">基礎招式</h3>
-
-    <!-- 區塊清單：橫向排列，超出寬度自動換行 -->
     <div class="chip-row">
-      <BlockChip
-        v-for="block in DEFAULT_BLOCKS"
-        :key="block.id"
-        :label="block.label"
-        :color="block.color"
-      />
+      <VueDraggable
+        v-model="localBlocks"
+        item-key="id"
+        tag="div"
+        class="chip-row__draggable"
+        :clone="cloneToPlaceholder"
+        :[DROP_ZONE_ATTRIBUTE]="true"
+        v-bind="dragOptions"
+        @start="handleDragStart"
+      >
+        <BlockChip
+          v-for="block in localBlocks"
+          :key="block.id"
+          :label="block.label"
+          :color="block.color"
+        />
+      </VueDraggable>
     </div>
-
   </section>
 </template>
 
@@ -42,8 +66,7 @@ import { DEFAULT_BLOCKS } from '@/constants/defaultBlocks'
   gap: 0.5rem;         /* 標題與區塊列之間的間距 */
   padding: 0.75rem 0;  /* 上下呼吸空間，左右由父層 SidebarPanel 控制 */
 }
-
-/* ── 區塊標題 ──────────────────────────────────────────────── */
+/* ── 區塊標題 ── */
 .field-title {
   margin: 0;
   font-size: 0.6875rem;    /* 11px，刻意縮小以不搶區塊視覺焦點 */
@@ -53,11 +76,14 @@ import { DEFAULT_BLOCKS } from '@/constants/defaultBlocks'
   color: rgba(255, 255, 255, 0.35);  /* 極淡，作為標籤而非主要內容 */
   user-select: none;
 }
-
-/* ── 橫向換行排列 ──────────────────────────────────────────── */
+/* ── 橫向換行排列 ── */
 .chip-row {
   display: flex;
   flex-wrap: wrap;    /* 超出寬度自動換行 */
   gap: 0.375rem;      /* 區塊間距：6px，緊湊但有呼吸感 */
+}
+/* 讓拖曳容器在版面上「隱形」，BlockChip 直接參與 .chip-row 的排列 */
+.chip-row__draggable {
+  display: contents;
 }
 </style>
