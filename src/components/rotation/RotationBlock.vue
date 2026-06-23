@@ -58,6 +58,6 @@ function handleClick(event: MouseEvent): void {
 <style scoped>
 /* 隱藏外層包裝盒模型，避免破壞 flex 排版 */
 .rotation-block {
-  display: contents;
+  display: inline-flex;;
 }
 </style>

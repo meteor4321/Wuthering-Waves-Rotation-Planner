@@ -357,7 +357,11 @@ function handleTrackClick(): void {
 }
 
 .track__draggable {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: var(--track-gap);
+  flex: 1;
+  min-width: 0;
 }
 
 .track__empty-dropzone {
