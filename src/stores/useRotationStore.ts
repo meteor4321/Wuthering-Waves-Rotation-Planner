@@ -260,6 +260,15 @@ export const useRotationStore = defineStore('rotation', () => {
     selectedIds.value.add(id);
   }
 
+  /**
+   * selectBlocks：批次選取一組區塊（marquee 框選用）。
+   * additive=false 時先清空既有選取；true 則累加到目前選取上。
+   */
+  function selectBlocks(ids: string[], additive: boolean = false): void {
+    if (!additive) selectedIds.value.clear();
+    ids.forEach((id) => selectedIds.value.add(id));
+  }
+
   function deselectBlock(id: string): void {
     selectedIds.value.delete(id);
   }
@@ -304,6 +313,7 @@ export const useRotationStore = defineStore('rotation', () => {
     deleteBlock,
     deleteSelectedBlocks,
     selectBlock,
+    selectBlocks,
     deselectBlock,
     clearSelection,
     isSelected,

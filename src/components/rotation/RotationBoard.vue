@@ -186,6 +186,81 @@ const previewLayout = computed<{
 const previewGridTemplate = computed<string>(() => previewLayout.value.template)
 const previewIdToColumn = computed<Map<string, number>>(() => previewLayout.value.idToColumn)
 
+// ── 跨三泳道矩形框選（marquee, 4.4e）──────────────────────────
+// 在面板空白處按下拖出矩形，鬆手時選取所有與矩形相交的區塊（不分泳道）。
+// 與既有拖曳互斥；按住 Ctrl/Meta 為累加選取。overlay 用 fixed（視窗座標），
+// 與 clientX/Y 一致，免受捲動位移影響。
+
+const marquee = ref<{ active: boolean; left: number; top: number; width: number; height: number }>({
+  active: false, left: 0, top: 0, width: 0, height: 0,
+})
+let _mqStartX = 0
+let _mqStartY = 0
+let _mqAdditive = false
+let _mqMoved = false
+let _justMarqueed = false
+
+function onBoardMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return
+  if (dragState.isDragging) return
+  // 只在空白處啟動：避開區塊、按鈕、輸入框、角色選單等互動元素
+  const t = event.target as Element | null
+  if (t?.closest('.rotation-block, button, input, [role="combobox"], .char-selector__listbox')) return
+
+  _mqStartX = event.clientX
+  _mqStartY = event.clientY
+  _mqAdditive = event.ctrlKey || event.metaKey
+  _mqMoved = false
+  window.addEventListener('mousemove', onBoardMouseMove)
+  window.addEventListener('mouseup', onBoardMouseUp)
+}
+
+function onBoardMouseMove(event: MouseEvent): void {
+  const dx = event.clientX - _mqStartX
+  const dy = event.clientY - _mqStartY
+  // 小於閾值視為單純點擊，不啟動框選（交給原本的點擊清除選取）
+  if (!_mqMoved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return
+  _mqMoved = true
+  marquee.value = {
+    active: true,
+    left: Math.min(_mqStartX, event.clientX),
+    top: Math.min(_mqStartY, event.clientY),
+    width: Math.abs(dx),
+    height: Math.abs(dy),
+  }
+}
+
+function onBoardMouseUp(): void {
+  window.removeEventListener('mousemove', onBoardMouseMove)
+  window.removeEventListener('mouseup', onBoardMouseUp)
+
+  if (_mqMoved) {
+    const r = marquee.value
+    const right = r.left + r.width
+    const bottom = r.top + r.height
+    const hit: string[] = []
+    document.querySelectorAll<HTMLElement>('.rotation-block[data-entry-id]').forEach((el) => {
+      const b = el.getBoundingClientRect()
+      // 矩形相交（AABB）
+      if (b.left < right && b.right > r.left && b.top < bottom && b.bottom > r.top) {
+        const id = el.getAttribute('data-entry-id')
+        if (id) hit.push(id)
+      }
+    })
+    rotationStore.selectBlocks(hit, _mqAdditive)
+    _justMarqueed = true // 抑制隨後冒泡到 app-root 的 click 清除選取
+  }
+  marquee.value = { active: false, left: 0, top: 0, width: 0, height: 0 }
+}
+
+// 框選剛結束時，攔截緊接的 click（避免 App.vue root @click 清掉剛選取的區塊）
+function onBoardClickCapture(event: MouseEvent): void {
+  if (_justMarqueed) {
+    event.stopPropagation()
+    _justMarqueed = false
+  }
+}
+
 // ── 假資料初始化（Store 驗證用）────────────────────────────
 
 /**
@@ -252,6 +327,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  // 卸載時若仍在框選，移除殘留的全域監聽
+  window.removeEventListener('mousemove', onBoardMouseMove)
+  window.removeEventListener('mouseup', onBoardMouseUp)
 })
 </script>
 
@@ -260,6 +338,8 @@ onBeforeUnmount(() => {
     class="rotation-board"
     :[DELETE_ZONE_ATTRIBUTE]="true"
     aria-label="輸出軸面板"
+    @mousedown="onBoardMouseDown"
+    @click.capture="onBoardClickCapture"
   >
 
     <!--
@@ -300,6 +380,14 @@ onBeforeUnmount(() => {
         :color="entry.block.color || measurerColor(entry)"
       />
     </div>
+
+    <!-- 框選矩形（fixed，視窗座標）-->
+    <div
+      v-if="marquee.active"
+      class="marquee-box"
+      :style="{ left: marquee.left + 'px', top: marquee.top + 'px', width: marquee.width + 'px', height: marquee.height + 'px' }"
+      aria-hidden="true"
+    />
 
   </section>
 </template>
@@ -352,5 +440,15 @@ onBeforeUnmount(() => {
   pointer-events: none;
   display: flex;
   gap: 0.375rem;
+}
+
+/* ── 框選矩形（marquee） ────────────────────────────────────── */
+.marquee-box {
+  position: fixed;
+  z-index: 900;
+  pointer-events: none;
+  border: 1px solid rgba(34, 211, 238, 0.7);
+  background: rgba(34, 211, 238, 0.12);
+  border-radius: 2px;
 }
 </style>
