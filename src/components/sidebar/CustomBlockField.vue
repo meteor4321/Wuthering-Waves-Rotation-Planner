@@ -12,7 +12,12 @@ import type { TemplateBlock } from '@/types/block'
 
 const sidebarStore = useSidebarStore()
 const characterStore = useCharacterStore()
-const { getOrCreatePendingInstanceId, onSidebarDragStart, getSidebarSortableOptions } = useBlockDrag()
+const {
+  getOrCreatePendingInstanceId,
+  onSidebarDragStart,
+  getSidebarSortableOptions,
+  handleDragEnd: _handleDragEnd,
+} = useBlockDrag()
 
 // 三個槽位各自的模板列表，未選角的槽位給空陣列
 const slotTemplates = computed(() =>
@@ -45,6 +50,14 @@ function cloneToPlaceholder(original: TemplateBlock) {
 function handleDragStart(idx: number, event: { oldIndex?: number }): void {
   const template = localTemplatesPerSlot.value[idx]?.[event.oldIndex ?? -1]
   if (template) onSidebarDragStart(template)
+}
+
+// 拖曳結束：務必重置全域拖曳狀態（否則 isDragging 殘留 → 鬆手後仍顯示落點預覽，
+// 且下一次操作的落地會被汙染。DefaultBlockField 早已綁 @end，此處先前漏綁＝d1 病灶）。
+// 同時還原本地緩衝（pull:'clone' 只是拖出複製，原模板列維持不變）。
+function handleDragEnd(): void {
+  localTemplatesPerSlot.value = slotTemplates.value.map((t) => [...t])
+  _handleDragEnd()
 }
 
 function handleDelete(templateId: string): void {
@@ -99,6 +112,7 @@ function handleDelete(templateId: string): void {
           :clone="cloneToPlaceholder"
           v-bind="dragOptions"
           @start="(e: { oldIndex?: number }) => handleDragStart(idx, e)"
+          @end="handleDragEnd"
         >
           <div v-for="template in localTemplatesPerSlot[idx]" :key="template.id" class="chip-wrapper">
             <BlockChip :label="template.label" :color="template.color" />

@@ -6,10 +6,12 @@
 // 2. 綁定 localEntries 緩衝陣列，避免套件直接修改唯讀 props 導致 VDOM 脫鉤。
 // 3. 拖曳結束後由 useBlockDrag 換算全域索引並更新 store，watch 再同步回 localEntries。
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import RotationBlock from '@/components/rotation/RotationBlock.vue'
+import CharacterSelector from '@/components/character/CharacterSelector.vue'
 import { useRotationStore } from '@/stores/useRotationStore'
+import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useBlockDrag, DROP_ZONE_ATTRIBUTE, type SortableEventLike } from '@/composables/useBlockDrag'
 import type { Character } from '@/types/character'
 import type { RotationEntry } from '@/types/rotation'
@@ -38,6 +40,7 @@ const props = defineProps<Props>()
 // ── Store / Composable ──────────────────────────────────────
 
 const rotationStore = useRotationStore()
+const characterStore = useCharacterStore()
 const {
   dragState,
   onRotationDragStart,
@@ -123,6 +126,18 @@ function handleBlockSelect(entryId: string, event: MouseEvent): void {
 
 // ── 既有邏輯 ──────────────────────────────────────────────────
 
+// ＋ 按鈕在共用 grid 內的 0-based 欄序：該泳道自己最後一個區塊的欄序 + 1
+// （落在其後一欄，而非整條 grid 末端）。空泳道 → 第 0 欄（靠左）。
+// 用（非預覽版）欄序即可，因拖曳預覽期間 ＋ 會隱藏。
+const addButtonColumn = computed<number>(() => {
+  let lastCol = -1
+  for (const entry of localEntries.value) {
+    const col = props.idToColumnIndex.get(entry.id)
+    if (col != null && col > lastCol) lastCol = col
+  }
+  return lastCol + 1
+})
+
 // 定位本泳道最後一個區塊的全局索引；若為空則回傳全局末尾
 const insertAfterIndex = computed<number>(() => {
   const globalEntries = rotationStore.entries
@@ -134,21 +149,53 @@ const insertAfterIndex = computed<number>(() => {
   return globalEntries.length - 1
 })
 
-// 於本泳道末尾新增空白實體區塊
+// 目前處於行內編輯的區塊 id（null = 無）。集中於泳道控管，RotationBlock 以 prop 接收。
+const editingId = ref<string | null>(null)
+
+// 於本泳道末尾新增空白實體區塊，並立即進入行內編輯讓使用者輸入 label
 function handleAddBlock(): void {
   if (!props.character) return
-  rotationStore.addFreeformBlock(
+  const newId = rotationStore.addFreeformBlock(
     '',
     props.character.themeColor,
     props.slotIndex,
     props.character.id,
     insertAfterIndex.value,
   )
+  // 等 watch 把新區塊渲染進 localEntries 後再標記編輯（RotationBlock 會自動聚焦）
+  void nextTick(() => {
+    editingId.value = newId
+  })
+}
+
+// 雙擊區塊 → 進入編輯
+function handleRequestEdit(entryId: string): void {
+  editingId.value = entryId
+}
+
+// 提交：寫入 store（空字串由 store.updateLabel 處理為刪除），結束編輯
+function handleCommitLabel(entryId: string, label: string): void {
+  rotationStore.updateLabel(entryId, label)
+  if (editingId.value === entryId) editingId.value = null
+}
+
+// 取消：不動 store，結束編輯。若是剛新增的空白區塊（label 仍為空），順手刪除避免殘留空塊。
+function handleCancelEdit(entryId: string): void {
+  const entry = rotationStore.entries.find((e) => e.id === entryId)
+  if (entry && entry.block.label.trim() === '') {
+    rotationStore.deleteBlock(entryId)
+  }
+  if (editingId.value === entryId) editingId.value = null
 }
 
 // 點擊軌道空白處時清除全域選取
 function handleTrackClick(): void {
   rotationStore.clearSelection()
+}
+
+// header 選擇器變更角色 → 寫入 characterStore（slotCharacters 連動本泳道 character prop）
+function handleSelectCharacter(characterId: string): void {
+  characterStore.setCharacter(props.slotIndex, characterId)
 }
 </script>
 
@@ -172,25 +219,20 @@ function handleTrackClick(): void {
         aria-hidden="true"
       />
 
-      <div class="header__info">
-        <span
-          class="header__dot"
-          :style="{ backgroundColor: character?.themeColor ?? 'rgba(255,255,255,0.25)' }"
-          aria-hidden="true"
+      <div class="header__selector">
+        <CharacterSelector
+          :model-value="character?.id ?? null"
+          :options="characterStore.allCharacters"
+          placeholder="選擇角色"
+          @update:model-value="handleSelectCharacter"
         />
-        <span
-          class="header__name"
-          :class="{ 'header__name--empty': !character }"
-        >
-          {{ character?.nameZh ?? '未選角' }}
-        </span>
       </div>
 
       <span
         v-if="character"
         class="header__element"
         :style="{ color: character.themeColor }"
-        aria-label="`屬性：${character.element}`"
+        :aria-label="`屬性：${character.element}`"
       >
         {{ character.element }}
       </span>
@@ -229,9 +271,13 @@ function handleTrackClick(): void {
               :label="entry.block.label"
               :color="entry.block.color || character.themeColor"
               :is-selected="rotationStore.isSelected(entry.id)"
+              :is-editing="editingId === entry.id"
               :style="blockStyle(entry.id)"
               role="listitem"
               @select="(event) => handleBlockSelect(entry.id, event)"
+              @request-edit="handleRequestEdit(entry.id)"
+              @commit="(label) => handleCommitLabel(entry.id, label)"
+              @cancel="handleCancelEdit(entry.id)"
             />
 
             <!-- 落點空欄虛框：只有落點泳道畫；其他兩泳道因共用 template 也會同步空出該欄 -->
@@ -241,6 +287,21 @@ function handleTrackClick(): void {
               :style="{ gridColumn: String(placeholderColumn + 1) }"
               aria-hidden="true"
             />
+
+            <!-- ＋ 按鈕：定位在該泳道自己最後一個區塊之後（共用 grid 內以 grid-column 釘位）。
+                 被 SortableJS draggable:'.rotation-block' 選擇器排除，不會被當成可拖項。
+                 拖曳預覽期間隱藏，避免與落點空欄搶欄、或造成 grid 欄數變動。 -->
+            <button
+              v-show="!dragState.isDragging"
+              class="track__add-btn"
+              :style="{ gridColumn: String(addButtonColumn + 1) }"
+              type="button"
+              :aria-label="`在 ${character.nameZh} 的輸出軸新增區塊`"
+              :title="`新增區塊至 ${character.nameZh}`"
+              @click.stop="handleAddBlock"
+            >
+              ＋
+            </button>
           </VueDraggable>
 
           <div
@@ -249,21 +310,6 @@ function handleTrackClick(): void {
             aria-hidden="true"
           >
             拖放至此
-          </div>
-
-          <div
-            class="track__tail"
-            :class="{ 'track__tail--lane-empty': localEntries.length === 0 }"
-          >
-            <button
-              class="track__add-btn"
-              type="button"
-              :aria-label="`在 ${character.nameZh} 的輸出軸末尾新增區塊`"
-              :title="`新增區塊至 ${character.nameZh}`"
-              @click.stop="handleAddBlock"
-            >
-              ＋
-            </button>
           </div>
         </template>
 
@@ -276,7 +322,7 @@ function handleTrackClick(): void {
 <style scoped>
 /* ── CSS 自訂屬性 ────────────────────────────────────────── */
 .swimlane {
-  --header-width: 6rem;
+  --header-width: 8.5rem;
   --lane-height: 3.5rem;
   --lane-color: rgba(255, 255, 255, 0.18);
   --track-gap: 0.375rem;
@@ -335,37 +381,22 @@ function handleTrackClick(): void {
   transition: background-color 0.25s ease;
 }
 
-.header__info {
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
+.header__selector {
   width: 100%;
-  overflow: hidden;
 }
 
-.header__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background-color 0.25s ease;
+/* 泳道 header 空間有限，將共用的 CharacterSelector 觸發鈕壓成精簡尺寸 */
+.header__selector :deep(.char-selector__trigger) {
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  gap: 0.4rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
 }
 
-.header__name {
+.header__selector :deep(.char-selector__value) {
   font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.82);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: 0.02em;
-  line-height: 1;
-}
-
-.header__name--empty {
-  color: rgba(255, 255, 255, 0.25);
-  font-weight: 400;
-  font-style: italic;
 }
 
 .header__element {
@@ -447,22 +478,11 @@ function handleTrackClick(): void {
   pointer-events: none;
 }
 
-.track__tail {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding-left: 0.25rem;
-  padding-right: var(--track-px);
-}
-
-/* 空泳道時，draggable 命中區以 flex:1 撐滿整條泳道（不可改動），會把 ＋ 按鈕
-   擠到最右邊；用 order 讓 ＋ 按鈕排到最前（靠左），命中區範圍維持不變。 */
-.track__tail--lane-empty {
-  order: -1;
-  padding-left: 0;
-}
-
+/* ＋ 按鈕現位於共用 grid 內，用 grid-column 釘在該泳道最後一個區塊之後。
+   align-self/justify-self 控制其在欄內的對齊；空泳道（flex fallback）時自然靠左。 */
 .track__add-btn {
+  align-self: center;
+  justify-self: start;
   display: flex;
   align-items: center;
   justify-content: center;

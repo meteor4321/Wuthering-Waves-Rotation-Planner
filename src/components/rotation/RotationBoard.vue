@@ -230,14 +230,16 @@ function handleResize(): void {
 }
 
 onMounted(async () => {
-  // 為了在開發階段能立即看到三條泳道有資料，
-  // 先預設選入三位角色（僅當槽位為空時），再注入假區塊。
-  const slots = characterStore.slots
-  if (!slots[0].character) characterStore.setCharacter(0, 'jiyan')
-  if (!slots[1].character) characterStore.setCharacter(1, 'verina')
-  if (!slots[2].character) characterStore.setCharacter(2, 'shorekeeper')
+  // 角色改由各泳道 header 的 CharacterSelector 實際選入（4.4a）。
+  // 開發模式才預選三角色並注入假區塊，方便即時驗證；正式環境啟動為空白面板。
+  if (import.meta.env.DEV) {
+    const slots = characterStore.slots
+    if (!slots[0].character) characterStore.setCharacter(0, 'jiyan')
+    if (!slots[1].character) characterStore.setCharacter(1, 'verina')
+    if (!slots[2].character) characterStore.setCharacter(2, 'shorekeeper')
 
-  seedStoreWithStubData()
+    seedStoreWithStubData()
+  }
 
   // 首次量測：等假資料渲染進量測列後
   await remeasureAfterRender()

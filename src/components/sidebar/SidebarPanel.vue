@@ -4,6 +4,7 @@
 import { ref } from 'vue'
 import DefaultBlockField from '@/components/sidebar/DefaultBlockField.vue'
 import CustomBlockField from '@/components/sidebar/CustomBlockField.vue'
+import { SIDEBAR_ZONE_ATTRIBUTE } from '@/composables/useBlockDrag'
 
 type TabId = 'default' | 'custom'
 
@@ -17,7 +18,7 @@ const TABS: { id: TabId; label: string }[] = [
 </script>
 
 <template>
-  <aside class="sidebar-panel" aria-label="區塊側邊欄">
+  <aside class="sidebar-panel" :[SIDEBAR_ZONE_ATTRIBUTE]="true" aria-label="區塊側邊欄">
     
     <div class="segmented-control" role="tablist" aria-label="切換區塊類型">
       <button

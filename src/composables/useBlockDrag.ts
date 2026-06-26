@@ -12,6 +12,8 @@ export const DROP_ZONE_ATTRIBUTE = 'data-drop-zone';
 // 可刪除區（主軸面板內、三條泳道之外的空白）掛此屬性。
 // 三區語意：合法落點(泳道) > 可刪除區(主軸面板) > 其餘皆為禁止放置區(標題列/側邊欄/版面外)
 export const DELETE_ZONE_ATTRIBUTE = 'data-delete-zone';
+// 側邊欄序列化區（自訂模板面板）掛此屬性。主軸區塊拖到此處放開 → 序列化為角色模板。
+export const SIDEBAR_ZONE_ATTRIBUTE = 'data-sidebar-zone';
 
 export interface SortableEventLike {
   oldIndex?: number;
@@ -76,6 +78,8 @@ const _dragState = reactive<DragState>({
 //   - 禁止放置區(其餘)          → 一律禁止圖標(放開彈回)
 const DELETE_ZONE_BODY_CLASS = 'dragging-over-delete';
 const FORBIDDEN_BODY_CLASS = 'dragging-forbidden';
+// 主軸區塊懸停於側邊欄序列化區（拖回存成模板）時的浮動分身樣式
+const SIDEBAR_ZONE_BODY_CLASS = 'dragging-over-sidebar';
 
 // 拖曳時的「靜態欄位幾何快照」（含全部 entries 的欄位中心 x，依全域順序、左→右）。
 // 由 RotationBoard 於拖曳開始時讀原始佈局填入。落點 hit-test 改用此快照而非即時 DOM，
@@ -97,6 +101,25 @@ function _handleDragOver(event: MouseEvent): void {
   if (!_dragState.isDragging) return;
   // 游標可能落在 document/window 等非 Element 目標上（無 closest 方法），需防護。
   const target = event.target instanceof Element ? event.target : null;
+  const isRotationSource = _dragState.sourceType === 'rotation-instance';
+
+  // ── 前置：主軸區塊懸停於側邊欄序列化區 → 「拖回存成模板」落點（4.4d）──
+  // 走獨立分支：不畫禁止/刪除、不算主軸排序落點，僅標記 isOverSidebar 供 handleDragEnd
+  // 走 serializeToTemplate。只對主軸來源生效（側邊欄來源拖回側邊欄無意義，維持禁止）。
+  const overSidebar = isRotationSource && !!target?.closest(`[${SIDEBAR_ZONE_ATTRIBUTE}]`);
+  _dragState.isOverSidebar = overSidebar;
+  if (overSidebar) {
+    _dragState.isOverInvalidZone = true;
+    _dragState.isOverDeleteZone = false;
+    _dragState.previewInsertAfterIndex = null;
+    _dragState.previewSlotIndex = null;
+    document.body.classList.remove(DELETE_ZONE_BODY_CLASS);
+    document.body.classList.remove(FORBIDDEN_BODY_CLASS);
+    document.body.classList.add(SIDEBAR_ZONE_BODY_CLASS);
+    return;
+  }
+  document.body.classList.remove(SIDEBAR_ZONE_BODY_CLASS);
+
   const overValid = !!target?.closest(`[${DROP_ZONE_ATTRIBUTE}]`);
   const overDeleteZone = !overValid && !!target?.closest(`[${DELETE_ZONE_ATTRIBUTE}]`);
   const overForbidden = !overValid && !overDeleteZone;
@@ -104,7 +127,6 @@ function _handleDragOver(event: MouseEvent): void {
   _dragState.isOverInvalidZone = !overValid;
   _dragState.isOverDeleteZone = overDeleteZone;
 
-  const isRotationSource = _dragState.sourceType === 'rotation-instance';
   // 主軸區塊在可刪除區 → 紅紋；其餘非合法落點 → 禁止圖標（含側邊欄區塊在可刪除區）
   document.body.classList.toggle(DELETE_ZONE_BODY_CLASS, isRotationSource && overDeleteZone);
   document.body.classList.toggle(
@@ -192,6 +214,7 @@ function _resetDragState(): void {
   _columnBaseline = [];
   document.body.classList.remove(DELETE_ZONE_BODY_CLASS);
   document.body.classList.remove(FORBIDDEN_BODY_CLASS);
+  document.body.classList.remove(SIDEBAR_ZONE_BODY_CLASS);
   _detachDragOverListener();
 }
 
@@ -315,6 +338,9 @@ export function useBlockDrag() {
           return sourceBlock.characterId === targetCharacterId;
         },
       },
+      // 只有真實區塊可被拖曳；排除 grid 內的裝飾節點（落點虛框 .track__preview-slot、
+      // 行末的 ＋ 按鈕），否則它們會被算進 SortableJS 的 draggableIndex 而錯位。
+      draggable: '.rotation-block',
       // 落點視覺由自製跨泳道預覽負責，關閉 SortableJS 內建排序動畫避免 grid 下微抖
       animation: 0,
       ghostClass: 'sortable-ghost',

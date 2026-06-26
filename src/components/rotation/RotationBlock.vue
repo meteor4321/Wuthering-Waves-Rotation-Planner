@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // RotationBlock.vue：主時間軸區塊的純展示層 (Dumb Component)
-// 職責：僅負責 UI 渲染與事件上拋。不依賴 Store，選取與警告狀態均由父層 (Swimlane) 傳入。
+// 職責：UI 渲染與事件上拋；行內編輯的開合狀態由父層 (Swimlane) 以 isEditing 控制，
+//       本元件只負責「進入編輯時聚焦輸入、提交/取消時上拋」，不直接碰 store。
 
-import { ref } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import BlockChip from '@/components/ui/BlockChip.vue'
 
 interface Props {
@@ -16,25 +17,83 @@ interface Props {
   isSelected?: boolean
   /** 危險狀態 (懸停於無效區的紅色警告) */
   isDanger?: boolean
+  /** 是否處於行內編輯（由父層控制：新增即編輯 / 雙擊編輯） */
+  isEditing?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
   isDanger: false,
+  isEditing: false,
 })
 
 const emit = defineEmits<{
   /** 點擊選取。上拋原始 MouseEvent 供父層處理 Ctrl/Meta 多選邏輯 */
   select: [event: MouseEvent]
+  /** 雙擊要求進入編輯 */
+  'request-edit': []
+  /** 提交新文字（trim 與空字串處理交給父層 / store） */
+  commit: [label: string]
+  /** 取消編輯 */
+  cancel: []
 }>()
 
 // 本地 UI 狀態 (僅供 hover 視覺反饋)
 const isHovered = ref(false)
 
+// 行內編輯草稿與輸入框參照
+const draft = ref('')
+const inputRef = ref<HTMLInputElement | null>(null)
+// 避免 Enter 提交後 blur 再次提交造成重複（commit 會清 editing → 觸發 blur）
+let finishing = false
+
+// 進入編輯時：以目前 label 初始化草稿，聚焦並全選文字
+watch(
+  () => props.isEditing,
+  (editing) => {
+    if (editing) {
+      draft.value = props.label
+      finishing = false
+      void nextTick(() => {
+        inputRef.value?.focus()
+        inputRef.value?.select()
+      })
+    }
+  },
+  { immediate: true },
+)
+
 // 點擊事件：阻擋冒泡並將原始事件上拋
 function handleClick(event: MouseEvent): void {
   event.stopPropagation()
   emit('select', event)
+}
+
+function handleDblClick(event: MouseEvent): void {
+  event.stopPropagation()
+  emit('request-edit')
+}
+
+function commit(): void {
+  if (finishing) return
+  finishing = true
+  emit('commit', draft.value)
+}
+
+function cancel(): void {
+  if (finishing) return
+  finishing = true
+  emit('cancel')
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    commit()
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    cancel()
+  }
 }
 </script>
 
@@ -45,8 +104,25 @@ function handleClick(event: MouseEvent): void {
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
     @click="handleClick"
+    @dblclick="handleDblClick"
   >
+    <!-- 編輯態：以輸入框取代 chip 顯示。mousedown/pointerdown 阻擋冒泡，
+         避免 SortableJS 在點擊輸入框定位游標時誤啟動拖曳。 -->
+    <input
+      v-if="isEditing"
+      ref="inputRef"
+      v-model="draft"
+      class="rotation-block__input"
+      type="text"
+      :style="{ '--chip-bg': color }"
+      @keydown="onKeydown"
+      @blur="commit"
+      @click.stop
+      @mousedown.stop
+      @pointerdown.stop
+    />
     <BlockChip
+      v-else
       :label="label"
       :color="color"
       :is-hovered="isHovered && !isSelected"
@@ -60,5 +136,24 @@ function handleClick(event: MouseEvent): void {
 /* 隱藏外層包裝盒模型，避免破壞 flex 排版 */
 .rotation-block {
   display: inline-flex;;
+}
+
+/* 行內編輯輸入框：盡量貼合 BlockChip 的視覺尺寸，避免進入/離開編輯時版面跳動 */
+.rotation-block__input {
+  width: 3.25rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0 0.5rem;
+  border: 1.5px solid rgba(125, 211, 252, 0.85);
+  border-radius: 6px;
+  background-color: var(--chip-bg, #1e293b);
+  color: #fff;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.02em;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
 </style>

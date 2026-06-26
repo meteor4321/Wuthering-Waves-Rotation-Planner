@@ -118,7 +118,7 @@ export const useRotationStore = defineStore('rotation', () => {
     targetSlotIndex: SlotIndex,
     targetCharacterId: string,
     afterIndex: number = entries.value.length - 1
-  ): void {
+  ): string {
     const newBlock: Block = {
       id: generateUUID(),
       label,
@@ -140,6 +140,26 @@ export const useRotationStore = defineStore('rotation', () => {
     } else {
       entries.value = insertEntryAfterIndex(entries.value, newEntry, afterIndex);
     }
+
+    // 回傳新區塊 id，供呼叫端（如新增後立即進入行內編輯）取得目標
+    return newBlock.id;
+  }
+
+  /**
+   * updateLabel：更新主時間軸上某區塊的顯示文字（行內編輯提交）。
+   * 若 trim 後為空字串，視為「放棄此區塊」並直接刪除（對應新增空白區塊後未輸入即失焦）。
+   */
+  function updateLabel(id: string, label: string): void {
+    const trimmed = label.trim();
+    if (trimmed === '') {
+      deleteBlock(id);
+      return;
+    }
+    entries.value = entries.value.map((entry) =>
+      entry.id === id
+        ? { ...entry, block: { ...entry.block, label: trimmed } }
+        : entry
+    );
   }
 
   /**
@@ -264,6 +284,7 @@ export const useRotationStore = defineStore('rotation', () => {
     selectedEntries,
     instantiateBlock,
     addFreeformBlock,
+    updateLabel,
     insertClonedBlocks,
     moveBlock,
     deleteBlock,

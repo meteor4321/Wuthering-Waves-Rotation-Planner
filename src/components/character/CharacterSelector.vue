@@ -50,7 +50,46 @@ const listboxId = `char-selector-listbox-${instanceId}`
 const isOpen = ref(false)
 const highlightedIndex = ref(0)
 const rootRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
+const listboxRef = ref<HTMLElement | null>(null)
 const optionRefs: (HTMLLIElement | null)[] = []
+
+// 下拉清單 Teleport 到 <body> 並採 position:fixed，依 trigger 視窗座標定位。
+// 原因：本元件嵌在泳道 sticky header（位於 .board__scroll 的 overflow 容器內），
+// 若留在原處會被 overflow 裁切、且若有 transform 祖先 fixed 也會失效並被下方泳道蓋住
+// （a1/a2）。Teleport 到 body 徹底脫離祖先的裁切與堆疊脈絡。座標於開啟時量取，
+// 外層捲動/縮放時關閉（onWindowChange）；選單自身的捲動則排除、不關閉（a4）。
+const dropdownStyle = ref<Record<string, string>>({})
+
+function updateDropdownPosition(): void {
+  const el = triggerRef.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${r.bottom + 6}px`,
+    left: `${r.left}px`,
+    // a3：至少與 trigger 同寬，但給較大下限讓較長角色名不被截斷
+    minWidth: `${Math.max(r.width, 180)}px`,
+  }
+}
+
+// a5：依鳴潮角色屬性（element）分組。每個選項保留其在 props.options 的扁平索引，
+// 讓鍵盤高亮（highlightedIndex 對應扁平 options）與分組渲染共用同一套索引。
+const groupedOptions = computed<{ element: string; items: { char: Character; index: number }[] }[]>(() => {
+  const groups: { element: string; items: { char: Character; index: number }[] }[] = []
+  const byElement = new Map<string, { char: Character; index: number }[]>()
+  props.options.forEach((char, index) => {
+    let bucket = byElement.get(char.element)
+    if (!bucket) {
+      bucket = []
+      byElement.set(char.element, bucket)
+      groups.push({ element: char.element, items: bucket })
+    }
+    bucket.push({ char, index })
+  })
+  return groups
+})
 
 function setOptionRef(el: Element | null, index: number): void {
   optionRefs[index] = el as HTMLLIElement | null
@@ -71,6 +110,7 @@ function scrollHighlightedIntoView(): void {
 function openDropdown(): void {
   const selectedIdx = props.options.findIndex((o) => o.id === props.modelValue)
   highlightedIndex.value = selectedIdx >= 0 ? selectedIdx : 0
+  updateDropdownPosition()
   isOpen.value = true
   scrollHighlightedIntoView()
 }
@@ -148,24 +188,41 @@ function onTriggerKeydown(event: KeyboardEvent): void {
 }
 
 // ── 點擊外部關閉 ─────────────────────────────────────────
+// listbox 已 Teleport 到 body（不在 rootRef 內），需一併排除，否則點選項時
+// mousedown 會先判定為「外部」而關閉，導致 click 還沒選到就消失。
 function onDocumentMouseDown(event: MouseEvent): void {
-  if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
-    closeDropdown()
-  }
+  const t = event.target as Node
+  const inRoot = rootRef.value?.contains(t)
+  const inListbox = listboxRef.value?.contains(t)
+  if (!inRoot && !inListbox) closeDropdown()
+}
+
+// 外層（泳道捲動容器 / 視窗）捲動或縮放時，fixed 定位的選單會與 trigger 脫鉤 →
+// 關閉以免停在錯位（重開即取得新座標）。但「選單自身的內部捲動」要排除，
+// 否則滾輪瀏覽長清單會立刻收合（a4）。capture 以接住內層容器捲動。
+function onWindowChange(event: Event): void {
+  if (!isOpen.value) return
+  if (listboxRef.value && event.target instanceof Node && listboxRef.value.contains(event.target)) return
+  closeDropdown()
 }
 
 onMounted(() => {
   document.addEventListener('mousedown', onDocumentMouseDown)
+  window.addEventListener('scroll', onWindowChange, true)
+  window.addEventListener('resize', onWindowChange)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', onDocumentMouseDown)
+  window.removeEventListener('scroll', onWindowChange, true)
+  window.removeEventListener('resize', onWindowChange)
 })
 </script>
 
 <template>
   <div ref="rootRef" class="char-selector">
     <button
+      ref="triggerRef"
       type="button"
       class="char-selector__trigger"
       :class="{ 'char-selector__trigger--open': isOpen }"
@@ -192,37 +249,47 @@ onUnmounted(() => {
       <span class="char-selector__chevron" aria-hidden="true">▾</span>
     </button>
 
-    <Transition name="dropdown">
-      <ul
-        v-if="isOpen"
-        :id="listboxId"
-        class="char-selector__listbox"
-        role="listbox"
-      >
-        <li
-          v-for="(option, index) in options"
-          :id="`${listboxId}-option-${index}`"
-          :key="option.id"
-          :ref="(el) => setOptionRef(el as Element | null, index)"
-          role="option"
-          class="char-selector__option"
-          :class="{
-            'char-selector__option--highlighted': index === highlightedIndex,
-            'char-selector__option--selected': option.id === modelValue,
-          }"
-          :aria-selected="option.id === modelValue"
-          @mouseenter="highlightedIndex = index"
-          @click="selectOption(option)"
+    <Teleport to="body">
+      <Transition name="dropdown">
+        <ul
+          v-if="isOpen"
+          :id="listboxId"
+          ref="listboxRef"
+          class="char-selector__listbox"
+          :style="dropdownStyle"
+          role="listbox"
+          @wheel.stop
         >
-          <span
-            class="char-selector__swatch"
-            :style="{ '--swatch-color': option.themeColor }"
-            aria-hidden="true"
-          />
-          <span class="char-selector__option-name">{{ option.nameZh }}</span>
-        </li>
-      </ul>
-    </Transition>
+          <template v-for="group in groupedOptions" :key="group.element">
+            <li class="char-selector__group-label" role="presentation">
+              {{ group.element }}
+            </li>
+            <li
+              v-for="{ char, index } in group.items"
+              :id="`${listboxId}-option-${index}`"
+              :key="char.id"
+              :ref="(el) => setOptionRef(el as Element | null, index)"
+              role="option"
+              class="char-selector__option"
+              :class="{
+                'char-selector__option--highlighted': index === highlightedIndex,
+                'char-selector__option--selected': char.id === modelValue,
+              }"
+              :aria-selected="char.id === modelValue"
+              @mouseenter="highlightedIndex = index"
+              @click="selectOption(char)"
+            >
+              <span
+                class="char-selector__swatch"
+                :style="{ '--swatch-color': char.themeColor }"
+                aria-hidden="true"
+              />
+              <span class="char-selector__option-name">{{ char.nameZh }}</span>
+            </li>
+          </template>
+        </ul>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -305,11 +372,9 @@ onUnmounted(() => {
 
 /* ── 下拉清單 ───────────────────────────────────────────── */
 .char-selector__listbox {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 50;
+  /* position / top / left / width 由 dropdownStyle 內聯注入（fixed，避免被 overflow 裁切） */
+  position: fixed;
+  z-index: 1000;
   max-height: 320px;
   margin: 0;
   padding: 0.25rem;
@@ -331,6 +396,23 @@ onUnmounted(() => {
 .char-selector__listbox::-webkit-scrollbar-thumb {
   background-color: rgba(34, 211, 238, 0.25);
   border-radius: 3px;
+}
+
+/* ── 屬性分組標題（a5） ─────────────────────────────────── */
+.char-selector__group-label {
+  padding: 0.375rem 0.625rem 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(34, 211, 238, 0.55);
+  user-select: none;
+  position: sticky;
+  top: -0.25rem;
+  background-color: #111827;
+}
+
+.char-selector__group-label:first-child {
+  padding-top: 0.125rem;
 }
 
 /* ── 選項 ───────────────────────────────────────────────── */
