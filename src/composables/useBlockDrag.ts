@@ -29,6 +29,8 @@ interface DragState {
   isDragging: boolean;
   sourceType: DragSourceType | null;
   draggingId: string | null;
+  // 多選拖曳：整組被拖曳的區塊 id（依全域順序）。單拖時為 [draggingId]。
+  draggingIds: string[];
   draggingSourceBlock: DefaultBlock | TemplateBlock | null;
   // 側邊欄拖曳開始時就先產生好的「未來實體 id」，讓拖曳預覽用的暫時物件
   // 與之後寫入 store 的正式 InstanceBlock 共用同一個 id（key 全程不變，
