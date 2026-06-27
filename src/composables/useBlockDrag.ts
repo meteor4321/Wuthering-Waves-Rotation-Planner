@@ -151,13 +151,16 @@ function _resolveAfterIndex(clientX: number): number {
     _curAfter = _liveAfterIndexFromX(clientX);
     return _curAfter;
   }
+  // 黏滯邊距：觸發邊界比可視 column 外擴 M px，吸收游標停在邊緣時的手抖/次像素位移，
+  // 並讓換格後游標安穩落在新 column 的黏滯區內、不立即反向跳回 → 消除邊緣閃爍。
+  const M = 6;
   const r = slot.getBoundingClientRect();
-  if (clientX >= r.left && clientX <= r.right) {
-    return _curAfter; // 游標仍在當前 column 內 → 維持
+  if (clientX >= r.left - M && clientX <= r.right + M) {
+    return _curAfter; // 游標仍在當前 column（含黏滯邊距）內 → 維持
   }
   const cand = _liveAfterIndexFromX(clientX);
   const pts = _insertionPoints();
-  if (clientX > r.right) {
+  if (clientX > r.right + M) {
     const next = pts.find((p) => p > (_curAfter as number));
     _curAfter = Math.max(cand, next ?? (_curAfter as number));
   } else {
