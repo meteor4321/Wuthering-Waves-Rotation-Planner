@@ -137,35 +137,41 @@ function _insertionPoints(): number[] {
   return [-1, ..._liveCentersByGlobalIndex().map((c) => c.gi)];
 }
 
-// 遲滯解析（核心）：落點空欄的展開/收合以游標為準——
-// 游標仍在當前展開 column 的即時 x 範圍內就不變動；確實跨出邊界才往該方向移動
-// （至少前進一格；大跳躍取即時定位結果）。落點空欄寬度＝對稱遲滯帶 → 解決左右不對稱。
+// 遲滯解析（核心）：維持當前落點的判斷以「左右鄰居的中心點」為界——
+// 游標仍落在 [左鄰中心, 右鄰中心] 之間就不變動；確實跨出鄰居中心才往該方向移動
+// （至少前進一格；大跳躍取即時定位結果）。判斷界線跟「正在跨越的鄰居中心」一致，
+// 不再依賴被拖物自身寬度（落點空欄／slot 寬度），解決窄拖寬／寬拖窄時的不對稱閃爍。
 function _resolveAfterIndex(clientX: number): number {
   if (_curAfter === null) {
     _curAfter = _liveAfterIndexFromX(clientX);
     return _curAfter;
   }
-  const slot = document.querySelector<HTMLElement>('.track__preview-slot');
-  if (!slot) {
-    // 落點空欄尚未渲染（首幀）→ 即時定位
+  const list = _liveCentersByGlobalIndex();
+  // 左鄰中心＝afterIndex 對應區塊中心（afterIndex=-1 則無左鄰）；
+  // 右鄰中心＝afterIndex 之後第一個非拖曳區塊中心（超出陣列則無右鄰）。
+  const cur = _curAfter as number;
+  const leftCenter = list.find((c) => c.gi === cur)?.center;
+  const rightCenter = list.find((c) => c.gi > cur)?.center;
+  if (list.length === 0) {
+    // 無任何鄰居可比對（例如整列都在拖曳中）→ 即時定位
     _curAfter = _liveAfterIndexFromX(clientX);
     return _curAfter;
   }
-  // 黏滯邊距：觸發邊界比可視 column 外擴 M px，吸收游標停在邊緣時的手抖/次像素位移，
-  // 並讓換格後游標安穩落在新 column 的黏滯區內、不立即反向跳回 → 消除邊緣閃爍。
-  const M = 6;
-  const r = slot.getBoundingClientRect();
-  if (clientX >= r.left - M && clientX <= r.right + M) {
-    return _curAfter; // 游標仍在當前 column（含黏滯邊距）內 → 維持
+  // 維持區間 = [左鄰中心, 右鄰中心]：游標越過鄰居中心當下即換格（無額外遲滯邊距）。
+  // 因被拖區塊隱藏、落點空欄在當前間隙撐開，鄰居中心即天然的單點切換界，無重疊→不閃爍。
+  const okLeft = leftCenter === undefined || clientX >= leftCenter;
+  const okRight = rightCenter === undefined || clientX <= rightCenter;
+  if (okLeft && okRight) {
+    return _curAfter; // 游標仍在左右鄰居中心之間 → 維持
   }
   const cand = _liveAfterIndexFromX(clientX);
   const pts = _insertionPoints();
-  if (clientX > r.right + M) {
-    const next = pts.find((p) => p > (_curAfter as number));
-    _curAfter = Math.max(cand, next ?? (_curAfter as number));
+  if (!okRight) {
+    const next = pts.find((p) => p > cur);
+    _curAfter = Math.max(cand, next ?? cur);
   } else {
-    const prev = [...pts].reverse().find((p) => p < (_curAfter as number));
-    _curAfter = Math.min(cand, prev ?? (_curAfter as number));
+    const prev = [...pts].reverse().find((p) => p < cur);
+    _curAfter = Math.min(cand, prev ?? cur);
   }
   return _curAfter;
 }
