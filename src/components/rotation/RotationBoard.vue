@@ -76,6 +76,30 @@ async function remeasureAfterRender(): Promise<void> {
   measure()
 }
 
+// ── 側邊欄多選拖曳：量測整組來源模板的合計寬度（供落點預覽顯示對齊主軸的
+//    「自動調整寬度」空欄）。隱藏量測列只渲染 chip，量完加上塊間距加總。──
+const draggingGroupMeasurerRef = ref<HTMLElement | null>(null)
+const draggingGroupWidth = ref<number>(0)
+
+function measureDraggingGroup(): void {
+  const el = draggingGroupMeasurerRef.value
+  if (!el || el.children.length === 0) {
+    draggingGroupWidth.value = 0
+    return
+  }
+  const ws = Array.from(el.children).map((c) => (c as HTMLElement).getBoundingClientRect().width)
+  draggingGroupWidth.value = ws.reduce((a, b) => a + b, 0) + TRACK_GAP * (ws.length - 1)
+}
+
+watch(
+  () => dragState.draggingSourceBlocks,
+  async () => {
+    await nextTick()
+    measureDraggingGroup()
+  },
+  { deep: false },
+)
+
 watch(() => rotationStore.entries, remeasureAfterRender, { deep: true })
 // 行內編輯草稿變動時也重新量測，讓編輯中的區塊即時變寬
 watch(() => rotationStore.editingDraft, remeasureAfterRender)
@@ -121,6 +145,10 @@ const previewLayout = computed<{
   const idSet = new Set<string>(draggingIds.length ? draggingIds : draggingId ? [draggingId] : [])
 
   let placeholderWidth = dragState.draggingWidth
+  // 側邊欄多選拖入：空欄寬＝整組來源模板量得的合計寬度（對齊主軸「自動調整寬度」落點）
+  if (!isRotationSource && dragState.draggingSourceBlocks.length > 1 && draggingGroupWidth.value > 0) {
+    placeholderWidth = draggingGroupWidth.value
+  }
   if (isRotationSource && idSet.size > 0) {
     let sum = 0
     let cnt = 0
@@ -506,6 +534,17 @@ onBeforeUnmount(() => {
         :key="entry.id"
         :label="measurerLabel(entry)"
         :color="entry.block.color || measurerColor(entry)"
+      />
+    </div>
+
+    <!-- 側邊欄多選拖曳時，量測整組來源模板寬度（合計後供落點空欄寬度用）。
+         僅在多選拖曳期間有內容；color 不影響寬度，量 label 即可。 -->
+    <div ref="draggingGroupMeasurerRef" class="board__measurer" aria-hidden="true">
+      <BlockChip
+        v-for="(b, i) in dragState.draggingSourceBlocks"
+        :key="i"
+        :label="b.label"
+        :color="b.color"
       />
     </div>
 

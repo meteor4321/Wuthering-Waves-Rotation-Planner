@@ -50,7 +50,17 @@ function cloneToPlaceholder(original: TemplateBlock) {
 
 function handleDragStart(idx: number, event: { oldIndex?: number }): void {
   const template = localTemplatesPerSlot.value[idx]?.[event.oldIndex ?? -1]
-  if (template) onSidebarDragStart(template)
+  if (!template) return
+  // 抓起的模板在多選集合且選取 >1 → 整組依「選取先後順序」(selectedTemplateIds
+  // 為 Set，迭代序＝加入序) 一起拖；否則只拖這一個。
+  if (sidebarStore.isTemplateSelected(template.id) && sidebarStore.selectedTemplateIds.size > 1) {
+    const ordered = [...sidebarStore.selectedTemplateIds]
+      .map((id) => sidebarStore.templates.find((t) => t.id === id))
+      .filter((t): t is TemplateBlock => !!t)
+    onSidebarDragStart(template, ordered)
+  } else {
+    onSidebarDragStart(template)
+  }
 }
 
 // 拖曳結束：務必重置全域拖曳狀態（否則 isDragging 殘留 → 鬆手後仍顯示落點預覽，
