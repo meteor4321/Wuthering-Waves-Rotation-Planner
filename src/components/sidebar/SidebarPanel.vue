@@ -72,7 +72,9 @@ const TABS: { id: TabId; label: string }[] = [
 .segmented-control {
   display: flex;
   gap: 0.25rem;
-  padding: 0.5rem 0;
+  /* 右側預留 AppLayout 收合鈕的寬度，讓「預設／自訂」tab 不被絕對定位的
+     收合鈕蓋住（三者同一橫列、同層並排）。 */
+  padding: 0.5rem var(--app-toggle-reserve, 2.75rem) 0.5rem 0;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   margin-bottom: 0.25rem;
