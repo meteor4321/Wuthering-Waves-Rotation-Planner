@@ -99,13 +99,20 @@ withDefaults(defineProps<Props>(), {
 .block-chip__label {
   position: relative;
   z-index: 2;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, monospace;
-  font-size: 0.8125rem;  /* 13px */
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.93);
-  /* 輕微文字陰影增強可讀性 */
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  /* 中文字型補在 monospace 之後：monospace 無 CJK glyph 時改用真粗體的黑體，
+     避免 fallback 字型在高字重下假粗(faux-bold)使筆畫糊成一團。 */
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace,
+    'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  font-size: 0.9375rem;  /* 15px：加大文字在 chip 中的占比 */
+  font-weight: 700;      /* 粗體；700 有真字模，中文不會假粗擠筆畫 */
+  letter-spacing: 0.05em;
+  /* 維持霓虹白風格，靠描邊與背景分離 → 淺色塊不刺眼、深色塊不低對比。
+     微米白(0.95)削掉純白 glare；描邊加粗到 0.7px 讓最亮的氣動(#55FFB5)也讀得清；
+     paint-order 讓描邊在字下方使字緣乾淨不糊。 */
+  color: rgba(255, 255, 255, 0.95);
+  -webkit-text-stroke: 0.7px rgba(8, 12, 24, 0.65);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* ── 狀態：懸停（isHovered）────────────────────────────────── */

@@ -186,12 +186,16 @@ function onKeydown(event: KeyboardEvent): void {
   border: 1.5px solid rgba(125, 211, 252, 0.85);
   border-radius: 3px;
   background-color: var(--chip-bg, #1e293b);
-  color: #fff;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, monospace;
-  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.95);
+  -webkit-text-stroke: 0.7px rgba(8, 12, 24, 0.65);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace,
+    'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  font-size: 0.9375rem;
   font-weight: 700;
   text-align: center;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   outline: none;
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
