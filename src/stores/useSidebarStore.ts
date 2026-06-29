@@ -49,6 +49,12 @@ export const useSidebarStore = defineStore('sidebar', () => {
    */
   const templates = ref<TemplateBlock[]>(loadTemplatesFromStorage());
 
+  /**
+   * selectedTemplateIds：目前在模板庫被選取的模板 id 集合（Ctrl/Cmd 多選用）。
+   * 用於批量刪除；選取狀態不持久化，重整即清空。
+   */
+  const selectedTemplateIds = ref<Set<string>>(new Set());
+
   // ──────────────────────────────────────────
   // LocalStorage 自動同步
   // ──────────────────────────────────────────
@@ -146,6 +152,44 @@ export const useSidebarStore = defineStore('sidebar', () => {
    */
   function deleteTemplate(id: string): void {
     templates.value = templates.value.filter((t) => t.id !== id);
+    selectedTemplateIds.value.delete(id);
+  }
+
+  /**
+   * toggleTemplateSelection：切換模板的選取狀態。
+   * @param id - 目標模板 id
+   * @param additive - true（Ctrl/Cmd）時累加切換；false 時改為單選（清掉其他）
+   */
+  function toggleTemplateSelection(id: string, additive: boolean): void {
+    if (!additive) {
+      const onlyThis = selectedTemplateIds.value.size === 1 && selectedTemplateIds.value.has(id);
+      selectedTemplateIds.value.clear();
+      if (!onlyThis) selectedTemplateIds.value.add(id);
+      return;
+    }
+    if (selectedTemplateIds.value.has(id)) {
+      selectedTemplateIds.value.delete(id);
+    } else {
+      selectedTemplateIds.value.add(id);
+    }
+  }
+
+  /** clearTemplateSelection：清除所有模板選取。 */
+  function clearTemplateSelection(): void {
+    selectedTemplateIds.value.clear();
+  }
+
+  /** isTemplateSelected：該模板是否被選取。 */
+  function isTemplateSelected(id: string): boolean {
+    return selectedTemplateIds.value.has(id);
+  }
+
+  /** deleteSelectedTemplates：批量刪除目前選取的模板，並清空選取。 */
+  function deleteSelectedTemplates(): void {
+    if (selectedTemplateIds.value.size === 0) return;
+    const ids = selectedTemplateIds.value;
+    templates.value = templates.value.filter((t) => !ids.has(t.id));
+    selectedTemplateIds.value = new Set();
   }
 
   /**
@@ -158,10 +202,15 @@ export const useSidebarStore = defineStore('sidebar', () => {
 
   return {
     templates,
+    selectedTemplateIds,
     defaultBlocks,
     getTemplatesByCharacter,
     serializeToTemplate,
     deleteTemplate,
+    toggleTemplateSelection,
+    clearTemplateSelection,
+    isTemplateSelected,
+    deleteSelectedTemplates,
     showToast,
   };
 });

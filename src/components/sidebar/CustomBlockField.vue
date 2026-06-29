@@ -2,7 +2,7 @@
 // CustomBlockField.vue
 // 側邊欄「自訂模板」展示區，依目前三條泳道選中的角色即時分組顯示。
 // 不靠父層傳資料，自己讀角色與模板兩個 store，是個獨立運作的面板。
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -64,10 +64,41 @@ function handleDragEnd(): void {
 function handleDelete(templateId: string): void {
   sidebarStore.deleteTemplate(templateId)
 }
+
+// 點擊模板：Ctrl/Cmd 多選切換；純點擊單選/再點同一個則取消。
+// 拖曳後 SortableJS 仍可能補發 click，但落點是拖移而非真點擊，
+// 影響僅止於選取狀態切換（無破壞性），可接受。
+function handleTemplateClick(templateId: string, event: MouseEvent): void {
+  const additive = event.ctrlKey || event.metaKey
+  sidebarStore.toggleTemplateSelection(templateId, additive)
+}
+
+// 以 capture 階段攔截 Delete/Backspace：當模板庫有選取時優先刪模板，
+// 並 stopPropagation 阻止 window 上的全域快捷鍵（會誤刪主軸選取區塊）。
+function onKeydownCapture(event: KeyboardEvent): void {
+  if (event.key !== 'Delete' && event.key !== 'Backspace') return
+  if (sidebarStore.selectedTemplateIds.size === 0) return
+  const target = event.target as HTMLElement
+  const tag = target?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
+  event.preventDefault()
+  event.stopPropagation()
+  sidebarStore.deleteSelectedTemplates()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydownCapture, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydownCapture, true)
+  // 元件卸除（切換頁籤離開自訂模板）時清掉殘留選取
+  sidebarStore.clearTemplateSelection()
+})
 </script>
 
 <template>
-  <section class="custom-block-field">
+  <section class="custom-block-field" @click="sidebarStore.clearTemplateSelection()">
     <div
       v-for="(slot, idx) in characterStore.slots"
       :key="slot.slotIndex"
@@ -115,8 +146,17 @@ function handleDelete(templateId: string): void {
           @start="(e: { oldIndex?: number }) => handleDragStart(idx, e)"
           @end="handleDragEnd"
         >
-          <div v-for="template in localTemplatesPerSlot[idx]" :key="template.id" class="chip-wrapper">
-            <BlockChip :label="template.label" :color="slot.character ? getElementColor(slot.character.element) : template.color" />
+          <div
+            v-for="template in localTemplatesPerSlot[idx]"
+            :key="template.id"
+            class="chip-wrapper"
+            @click.stop="handleTemplateClick(template.id, $event)"
+          >
+            <BlockChip
+              :label="template.label"
+              :color="slot.character ? getElementColor(slot.character.element) : template.color"
+              :is-selected="sidebarStore.isTemplateSelected(template.id)"
+            />
 
             <button
               class="delete-btn"
