@@ -307,6 +307,7 @@ function handleSelectCharacter(characterId: string): void {
               :color="laneColor"
               :is-selected="rotationStore.isSelected(entry.id)"
               :is-editing="rotationStore.editingId === entry.id"
+              :is-leaving="rotationStore.isLeaving(entry.id)"
               :style="blockStyle(entry.id)"
               role="listitem"
               @select="(event) => handleBlockSelect(entry.id, event)"

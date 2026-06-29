@@ -12,6 +12,13 @@ import type { Block, AnyBlock, DefaultBlock, TemplateBlock } from '../types/bloc
 import type { SlotIndex } from '../types/character';
 import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
+
+/** 刪除消失動畫時長(ms)，須與 RotationBlock 的 @keyframes block-leave 一致。 */
+const LEAVE_MS = 180;
+/** 是否偏好減少動畫（reduce 時略過刪除動畫、直接移除）。 */
+const _reducedMotion =
+  typeof window !== 'undefined' &&
+  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 import {
   insertEntryAfterIndex,
   removeEntryById,
@@ -46,6 +53,12 @@ export const useRotationStore = defineStore('rotation', () => {
    */
   const editingId = ref<string | null>(null);
   const editingDraft = ref<string>('');
+
+  /**
+   * leavingIds：正在播放刪除消失動畫的區塊 id 集合。
+   * 區塊仍留在 entries 中（佔欄位、可播動畫），動畫結束後才真正移除。
+   */
+  const leavingIds = ref<Set<string>>(new Set());
 
   // ──────────────────────────────────────────
   // Computed（衍生狀態）
@@ -307,11 +320,30 @@ export const useRotationStore = defineStore('rotation', () => {
 
   /**
    * deleteSelectedBlocks：批量刪除目前所有被選中的區塊。
+   * 先標記 leavingIds 播放消失動畫，LEAVE_MS 後才真正從 entries 移除
+   *（reduce 動畫偏好或無選取時直接移除）。
    */
   function deleteSelectedBlocks(): void {
     const idsToDelete = [...selectedIds.value];
-    entries.value = removeEntriesByIds(entries.value, idsToDelete);
+    if (idsToDelete.length === 0) return;
+    // 立即清除選取，讓區塊在消失動畫期間呈現未選取樣式
     selectedIds.value.clear();
+
+    if (_reducedMotion) {
+      entries.value = removeEntriesByIds(entries.value, idsToDelete);
+      return;
+    }
+
+    idsToDelete.forEach((id) => leavingIds.value.add(id));
+    setTimeout(() => {
+      entries.value = removeEntriesByIds(entries.value, idsToDelete);
+      idsToDelete.forEach((id) => leavingIds.value.delete(id));
+    }, LEAVE_MS);
+  }
+
+  /** isLeaving：該區塊是否正在播放刪除消失動畫。 */
+  function isLeaving(id: string): boolean {
+    return leavingIds.value.has(id);
   }
 
   function selectBlock(id: string, isMultiSelect: boolean = false): void {
@@ -379,6 +411,7 @@ export const useRotationStore = defineStore('rotation', () => {
     moveBlocks,
     deleteBlock,
     deleteSelectedBlocks,
+    isLeaving,
     selectBlock,
     selectBlocks,
     deselectBlock,

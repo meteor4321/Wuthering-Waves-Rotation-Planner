@@ -19,12 +19,15 @@ interface Props {
   isDanger?: boolean
   /** 是否處於行內編輯（由父層控制：新增即編輯 / 雙擊編輯） */
   isEditing?: boolean
+  /** 是否正在播放刪除消失動畫 */
+  isLeaving?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
   isDanger: false,
   isEditing: false,
+  isLeaving: false,
 })
 
 const emit = defineEmits<{
@@ -107,6 +110,7 @@ function onKeydown(event: KeyboardEvent): void {
 <template>
   <div
     class="rotation-block"
+    :class="{ 'is-leaving': isLeaving }"
     :data-entry-id="entryId"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
@@ -144,6 +148,30 @@ function onKeydown(event: KeyboardEvent): void {
 /* 隱藏外層包裝盒模型，避免破壞 flex 排版 */
 .rotation-block {
   display: inline-flex;;
+}
+
+/* 刪除消失動畫：刻意只動內層 .block-chip 的 opacity/transform，不碰 .rotation-block
+   的 transform（該屬性保留給 SortableJS 浮動分身與拖曳 FLIP，見專案記憶）。
+   forwards 保留結束幀，避免移除前的最後一刻閃回原狀。 */
+.rotation-block.is-leaving {
+  pointer-events: none;
+}
+
+.rotation-block.is-leaving :deep(.block-chip) {
+  animation: block-leave 0.18s ease forwards;
+}
+
+@keyframes block-leave {
+  to {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotation-block.is-leaving :deep(.block-chip) {
+    animation: none;
+  }
 }
 
 /* 行內編輯輸入框：填滿由草稿即時驅動的欄寬（grid item 預設 stretch → 等於欄寬）。
