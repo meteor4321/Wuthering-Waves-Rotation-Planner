@@ -12,11 +12,12 @@ import RotationAxisTabBar from '@/components/rotation/RotationAxisTabBar.vue'
 import RotationExportView from '@/components/rotation/RotationExportView.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useExportDialog } from '@/composables/useExportDialog'
-import { nodeToPngBlob, savePng } from '@/composables/useImageExport'
+import { nodeToPngBlob, savePng, saveZip } from '@/composables/useImageExport'
 import { showToast } from '@/composables/useToast'
 import { useRotationStore } from '@/stores/useRotationStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { nextTick, ref } from 'vue'
+import JSZip from 'jszip'
 import type { RotationAxis } from '@/types/rotation'
 
 const rotationStore = useRotationStore()
@@ -25,40 +26,67 @@ const exportDialog = useExportDialog()
 
 useKeyboardShortcuts()
 
-// 離螢幕匯出舞台:把要輸出的軸暫時掛上,點陣化後清空。
+// 離螢幕匯出舞台:把要輸出的軸暫時掛上(可同時多軸供合併),點陣化後清空。
 const exportStageRef = ref<HTMLElement | null>(null)
-const renderAxis = ref<RotationAxis | null>(null)
+const renderAxes = ref<RotationAxis[]>([])
 
-// 把指定軸渲染到離螢幕舞台,等繪製與字型就緒後截成 PNG Blob。
-async function renderAxisToBlob(axis: RotationAxis): Promise<Blob> {
-  renderAxis.value = axis
-  try {
-    await nextTick()
-    const node = exportStageRef.value?.querySelector<HTMLElement>('.export-view')
-    if (!node) throw new Error('找不到匯出視圖節點')
-    return await nodeToPngBlob(node)
-  } finally {
-    renderAxis.value = null
-  }
+// 把一組軸渲染到離螢幕舞台,等繪製與字型就緒後,截取指定節點成 PNG Blob。
+//  - 合併:傳入多軸,截取整個 .export-merge-wrap(多軸縱向堆疊)。
+//  - 單張:傳入單軸,截取該軸的 .export-view。
+async function renderToBlob(axes: RotationAxis[], selector: string): Promise<Blob> {
+  renderAxes.value = axes
+  await nextTick()
+  const node = exportStageRef.value?.querySelector<HTMLElement>(selector)
+  if (!node) throw new Error('找不到匯出視圖節點')
+  return await nodeToPngBlob(node)
 }
 
-// 匯出流程入口：開設定視窗 → 取得選項 → 點陣化 → 存檔。
-// 階段三:單軸。多軸合併 / 分開(ZIP)於階段四接上。
+// 檔名淨化:移除檔案系統 / ZIP 條目不允許的字元。
+function sanitizeName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'axis'
+}
+
+// 匯出流程入口：開設定視窗 → 取得選項 → 點陣化 →(合併 / 分開 ZIP)→ 存檔。
 async function handleExport(): Promise<void> {
   const options = await exportDialog.open()
   if (!options) return
 
-  const axis = rotationStore.axes.find((a) => a.id === options.axisIds[0])
-  if (!axis) return
+  const axes = options.axisIds
+    .map((id) => rotationStore.axes.find((a) => a.id === id))
+    .filter((a): a is RotationAxis => a != null)
+  if (axes.length === 0) return
 
   try {
-    const blob = await renderAxisToBlob(axis)
-    const saved = await savePng(blob, options.filename)
-    if (saved) showToast('已匯出圖片', 'success')
+    if (axes.length === 1 || options.mode === 'merge') {
+      // 單軸或合併:一張 PNG。多軸截整個堆疊容器,單軸截該視圖。
+      const selector = axes.length > 1 ? '.export-merge-wrap' : '.export-view'
+      const blob = await renderToBlob(axes, selector)
+      renderAxes.value = []
+      const saved = await savePng(blob, options.filename)
+      if (saved) showToast('已匯出圖片', 'success')
+    } else {
+      // 多軸分開:逐軸出 PNG → 打包成單一 ZIP。
+      const zip = new JSZip()
+      const usedNames = new Set<string>()
+      for (const axis of axes) {
+        const blob = await renderToBlob([axis], '.export-view')
+        let entry = sanitizeName(axis.name)
+        let n = 2
+        while (usedNames.has(entry)) entry = `${sanitizeName(axis.name)} (${n++})`
+        usedNames.add(entry)
+        zip.file(`${entry}.png`, blob)
+      }
+      renderAxes.value = []
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const saved = await saveZip(zipBlob, options.filename)
+      if (saved) showToast('已匯出 ZIP', 'success')
+    }
   } catch (err) {
     console.error('[export] 匯出失敗', err)
     const msg = err instanceof Error ? err.message : String(err)
     showToast(`匯出失敗:${msg}`, 'danger', 6000)
+  } finally {
+    renderAxes.value = []
   }
 }
 
@@ -104,9 +132,12 @@ function clearAllSelection(): void {
     <DialogHost />
     <ExportDialog />
 
-    <!-- 離螢幕匯出舞台:平時不渲染任何軸,匯出時才暫時掛上要輸出的軸供截圖 -->
+    <!-- 離螢幕匯出舞台:平時不渲染任何軸,匯出時才暫時掛上要輸出的軸供截圖。
+         合併多軸時,export-merge-wrap 內縱向堆疊多個視圖,整塊截一張。 -->
     <div ref="exportStageRef" class="export-stage" aria-hidden="true">
-      <RotationExportView v-if="renderAxis" :axis="renderAxis" />
+      <div v-if="renderAxes.length" class="export-merge-wrap">
+        <RotationExportView v-for="ax in renderAxes" :key="ax.id" :axis="ax" />
+      </div>
     </div>
   </div>
 </template>
@@ -148,5 +179,12 @@ function clearAllSelection(): void {
     left: -99999px;
     top: 0;
     pointer-events: none;
+  }
+
+  /* 合併多軸:縱向堆疊各軸視圖,容器寬度貼齊最寬的一軸;深色底填滿軸間縫隙 */
+  .export-merge-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    background-color: #0A0F1E;
   }
 </style>
