@@ -6,8 +6,10 @@
 // 退回的狀態。任一可記錄操作執行前，先把當下狀態壓入 past；undo 時把當下
 // 狀態壓入 future、再套用 past 頂端；redo 反向。past/future 上限各 30 步。
 //
-// 【階段一範圍】目前只納入 rotationStore.entries（時間軸增刪改移貼）。
-// laneOrder、characterStore.slots 留待階段二。
+// 【範圍】納入三項使用者可感知的編輯狀態：
+//   - rotationStore.entries（時間軸增刪改移貼）
+//   - useLaneOrder.laneOrder（泳道上下顯示順序）
+//   - characterStore.slots（三槽選角；換角色連帶清空泳道區塊一併還原）
 //
 // 【合併同一批次】一個使用者操作可能觸發多次 store 寫入（例如一次拖曳落定
 // 在同一個同步 setTimeout 內連呼多次 instantiateBlock，或 updateLabel 內部
@@ -19,13 +21,18 @@
 import { ref, computed } from 'vue';
 import { deepClone } from '@/utils/deepClone';
 import { useRotationStore } from '@/stores/useRotationStore';
+import { useCharacterStore } from '@/stores/useCharacterStore';
+import { useLaneOrder } from '@/composables/useLaneOrder';
 import type { RotationArray } from '@/types/rotation';
+import type { CharacterSlots, SlotIndex } from '@/types/character';
 
 /** past / future 各自的最大保存步數。 */
 const MAX_HISTORY = 30;
 
 interface Snapshot {
   entries: RotationArray;
+  laneOrder: SlotIndex[];
+  slots: CharacterSlots;
 }
 
 // 模組層級單例：整個 App 共用同一份歷史。
@@ -40,13 +47,23 @@ let _applying = false;
 export function useHistory() {
   function _snapshot(): Snapshot {
     const store = useRotationStore();
-    return { entries: deepClone(store.entries) };
+    const characterStore = useCharacterStore();
+    const { laneOrder } = useLaneOrder();
+    return {
+      entries: deepClone(store.entries),
+      laneOrder: deepClone(laneOrder.value),
+      slots: deepClone(characterStore.slots),
+    };
   }
 
   function _apply(snap: Snapshot): void {
     const store = useRotationStore();
+    const characterStore = useCharacterStore();
+    const { laneOrder } = useLaneOrder();
     _applying = true;
     store.entries = deepClone(snap.entries);
+    laneOrder.value = deepClone(snap.laneOrder);
+    characterStore.slots = deepClone(snap.slots);
     // 套用後選取／編輯態可能指向已不存在的 id，一律清空避免懸空參照。
     store.clearSelection();
     store.stopEditing();

@@ -400,6 +400,7 @@ export const useRotationStore = defineStore('rotation', () => {
    * 用於更換泳道角色時清掉舊角色殘留的區塊。
    */
   function clearSlot(slotIndex: SlotIndex): void {
+    history.record();
     entries.value = entries.value.filter((entry) => {
       if (entry.slotIndex === slotIndex) {
         selectedIds.value.delete(entry.id);
