@@ -1,91 +1,58 @@
 // ============================================================
-// block.ts
-// 定義「區塊（Block）」相關的所有介面與型別。
-// 區塊是本專案最核心的資料單位。
+// block.ts — 區塊（Block）資料型別。
+//
+// 設計原則：
+//   - 區塊為純文字＋視覺呈現，不綁定招式語意。
+//   - 三種來源以 source 字面量區分：default（內建、不可刪）/
+//     template（側邊欄自訂）/ instance（主軸實體）。
+//   - 主軸陣列只存 InstanceBlock；AnyBlock 為需跨來源時的聯合型別。
 // ============================================================
 
-/**
- * 區塊的來源分類。
- * - 'default'  ：系統內建的基礎招式區塊（不可修改、不可刪除）
- * - 'template' ：使用者自訂並儲存在側邊欄的模板區塊
- * - 'instance' ：主時間軸上的實體區塊（包含從模板拖入或直接新增的空白區塊）
- */
+/** 區塊來源：內建 / 側邊欄模板 / 主軸實體。 */
 export type BlockSource = 'default' | 'template' | 'instance';
 
-/**
- * 區塊顏色設定。
- * 使用 Tailwind CSS 的任意值語法相容的 hex 字串，例如 '#7C3AED'。
- * 預設區塊使用系統預設色，自訂區塊可由使用者自由指定。
- */
+/** 區塊背景色，hex 字串（如 '#7C3AED'）。 */
 export type BlockColor = string;
 
-/**
- * BlockBase：所有區塊共用的基礎欄位。
- * 拔除了原先綁定的基礎招式限制，回歸純文字與視覺呈現。
- */
+/** 所有區塊共用的基礎欄位。 */
 export interface BlockBase {
-  /** 區塊顯示文字，例如 'A'、'3AE'，或是使用者自由輸入的任意文字 */
+  /** 顯示文字（如 'A'、'3AE' 或使用者自由輸入）。 */
   label: string;
-
-  /** 區塊的背景顏色（hex 字串），由使用者或系統指定 */
+  /** 背景顏色 hex。 */
   color: BlockColor;
-
-  /** 此區塊所屬的角色 ID（對應 Character.id）。
-   * null 代表預設通用區塊，不綁定任何角色。 */
+  /** 所屬角色 id（對應 Character.id）；null 為不綁角色的通用區塊。 */
   characterId: string | null;
-
-  /**
-   * 預留標籤欄位，供未來實作 Buff 狀態標記與 Tooltip 使用。
-   */
+  /** 預留：Buff 狀態標記與 Tooltip。 */
   tags: string[];
 }
 
-/**
- * DefaultBlock：系統預設的基礎招式區塊。
- * source 固定為 'default'，不參與排序也不可被刪除。
- */
+/** 系統內建基礎招式區塊（不可刪、不參與排序）。 */
 export interface DefaultBlock extends BlockBase {
-  id: string; // 靜態 ID，例如 'default-A'
+  id: string; // 靜態 id，如 'default-A'
   source: 'default';
   characterId: null;
 }
 
-/**
- * TemplateBlock：使用者自訂並存放在側邊欄的模板區塊。
- * source 固定為 'template'。
- */
+/** 側邊欄自訂模板區塊（必綁某一角色）。 */
 export interface TemplateBlock extends BlockBase {
-  id: string; // 統一使用泛用 id（UUID）
+  id: string;
   source: 'template';
-  /** 模板所屬角色，不可為 null（自訂模板一定屬於某一角色） */
   characterId: string;
-  /** 建立時間戳，用於側邊欄排序顯示 */
+  /** 建立時間戳，供側邊欄排序。 */
   createdAt: number;
 }
 
-/**
- * InstanceBlock：主時間軸上的實體區塊。
- * 無論是從側邊欄拖入的模板，還是使用者在主軸直接新增的空白區塊，都屬於此類別。
- */
+/** 主軸實體區塊（拖入的模板或直接新增皆屬此類）。 */
 export interface InstanceBlock extends BlockBase {
-  id: string; // 統一使用泛用 id（UUID）
+  id: string;
   source: 'instance';
   characterId: string;
-  /**
-   * 追蹤此實體來源於哪個模板（templateId）或預設區塊（defaultBlockId）。
-   * 若為使用者在主軸上直接新增的空白/自訂區塊，則此欄位為 null。
-   */
+  /** 來源模板/預設區塊 id；主軸直接新增則為 null。 */
   originId: string | null;
 }
 
-/**
- * Block：主時間軸 1D 陣列中儲存的聯合型別。
- * 主軸上的元素一定是 InstanceBlock。
- */
+/** 主軸 1D 陣列的元素型別。 */
 export type Block = InstanceBlock;
 
-/**
- * AnyBlock：涵蓋所有來源的區塊聯合型別。
- * 用於需要同時處理側邊欄與主軸區塊的通用函式（例如渲染元件）。
- */
+/** 跨所有來源的區塊聯合型別（供通用渲染函式）。 */
 export type AnyBlock = DefaultBlock | TemplateBlock | InstanceBlock;

@@ -1,8 +1,11 @@
 // ============================================================
-// useRotationStore.ts
-// 核心 Pinia Store：管理整個 1D 輸出軸陣列（RotationArray）。
+// useRotationStore.ts — 核心 Pinia Store：管理 1D 輸出軸陣列。
 //
-// 這是本專案最重要的 store，所有對主時間軸的增刪改查都在這裡。
+// 設計原則：
+//   - 所有主時間軸的增刪改查集中於此。
+//   - 對外暴露的 entries 是「作用中輸出軸 entries」的 writable computed
+//     代理 → 既有時間軸操作在多軸下零改動即可運作。
+//   - 每個會改 entries 的 action 起手呼叫 history.record()（同批次只記一步）。
 // ============================================================
 
 import { defineStore } from 'pinia';
@@ -30,31 +33,22 @@ import {
 } from '../utils/arrayHelpers';
 
 export const useRotationStore = defineStore('rotation', () => {
-  // ──────────────────────────────────────────
-  // State（響應式狀態）
-  // ──────────────────────────────────────────
+  // ── State ──────────────────────────────────
 
-  /**
-   * axes：所有「輸出軸」(類似 Excel 工作表分頁),每個各自擁有一條 entries。
-   * 初始僅一條空白輸出軸。隊伍/泳道順序/歷史跨軸共用(見 useHistory)。
-   */
+  /** 所有輸出軸（各持一條 entries）；初始一條空白軸。 */
   const axes = ref<RotationAxis[]>([
     { id: generateUUID(), name: '輸出軸 1', entries: [] },
   ]);
 
-  /** activeAxisId：目前作用中(畫面顯示)的輸出軸 id。 */
+  /** 目前作用中的輸出軸 id。 */
   const activeAxisId = ref<string>(axes.value[0].id);
 
-  /** activeAxis：目前作用中的輸出軸物件(找不到時退回第一條,確保永不為空)。 */
+  /** 作用中輸出軸物件（找不到退回第一條，確保永不為空）。 */
   const activeAxis = computed<RotationAxis>(
     () => axes.value.find((a) => a.id === activeAxisId.value) ?? axes.value[0]
   );
 
-  /**
-   * entries：對外暴露的核心 1D 陣列 —— 實為「作用中輸出軸 entries」的 writable
-   * computed 代理。讀寫都落到 activeAxis,使所有既有時間軸操作(及 RotationBoard
-   * 的量測/分流、useBlockDrag)零改動即可在多軸下運作。
-   */
+  /** 核心 1D 陣列：作用中軸 entries 的 writable computed 代理。 */
   const entries = computed<RotationArray>({
     get: () => activeAxis.value.entries,
     set: (val) => {
@@ -62,62 +56,34 @@ export const useRotationStore = defineStore('rotation', () => {
     },
   });
 
-  /**
-   * selectedIds：目前被選中的區塊 id 集合。
-   * 使用 Set 確保不重複，並讓 has() 操作達到 O(1)。
-   */
+  /** 被選中的區塊 id 集合（Set，has 為 O(1)）。 */
   const selectedIds = ref<Set<string>>(new Set());
 
-  /**
-   * editingId / editingDraft：目前處於行內編輯的區塊 id 與其草稿文字。
-   * 集中於 store 是為了讓 RotationBoard 的隱藏量測列能即時「看到」尚未提交的
-   * 草稿文字，據以即時重算欄寬 → 編輯時區塊寬度隨輸入即時調整、鄰塊即時順延。
-   * editingId 為 null 代表目前無區塊在編輯。
-   */
+  // 行內編輯的區塊 id 與即時草稿：集中於 store，讓隱藏量測列即時讀草稿重算欄寬
+  // → 編輯時區塊寬度隨輸入即時變、鄰塊順延。editingId 為 null＝無編輯中。
   const editingId = ref<string | null>(null);
   const editingDraft = ref<string>('');
 
-  /**
-   * leavingIds：正在播放刪除消失動畫的區塊 id 集合。
-   * 區塊仍留在 entries 中（佔欄位、可播動畫），動畫結束後才真正移除。
-   */
+  /** 正在播刪除消失動畫的 id 集合；仍留在 entries 佔欄位，動畫結束才真正移除。 */
   const leavingIds = ref<Set<string>>(new Set());
 
-  // Undo/Redo 歷史：在每個會改動 entries 的 action 起手呼叫 history.record()
-  // 先封存「變更前」狀態（同一同步批次只記一步，邏輯見 useHistory）。
   const history = useHistory();
 
-  // ──────────────────────────────────────────
-  // Computed（衍生狀態）
-  // ──────────────────────────────────────────
+  // ── Computed ───────────────────────────────
 
-  /**
-   * totalBlockCount：主時間軸上的總區塊數。
-   */
+  /** 主時間軸總區塊數。 */
   const totalBlockCount = computed(() => entries.value.length);
 
-  /**
-   * selectedEntries：目前被選中的條目列表。
-   * 維持在 1D 陣列中的相對時間順序。
-   */
+  /** 被選中的條目（維持 1D 陣列的相對時間順序）。 */
   const selectedEntries = computed(() =>
     entries.value.filter((e) => selectedIds.value.has(e.id))
   );
 
-  // ──────────────────────────────────────────
-  // Actions（操作方法）
-  // ──────────────────────────────────────────
+  // ── Actions ────────────────────────────────
 
   /**
-   * instantiateBlock：從側邊欄區塊建立一個新的 InstanceBlock 並加入時間軸。
-   *
-   * @param sourceBlock - 來源區塊（DefaultBlock 或 TemplateBlock）
-   * @param targetSlotIndex - 要放置的泳道索引
-   * @param targetCharacterId - 目標角色 ID
-   * @param afterIndex - 插入在哪個索引之後（預設追加末尾）
-   * @param forcedId - 指定要使用的 id（例如拖曳預覽階段已先產生好的 id，
-   *   讓正式資料與預覽用的暫時物件共用同一個 id，維持 :key 穩定）；
-   *   未提供時才內部重新產生一個新的 UUID
+   * 從側邊欄區塊建立 InstanceBlock 並加入時間軸。
+   * forcedId：沿用拖曳預覽已產生的 id 使 :key 穩定；未給則新產生 UUID。
    */
   function instantiateBlock(
     sourceBlock: DefaultBlock | TemplateBlock,
@@ -151,17 +117,7 @@ export const useRotationStore = defineStore('rotation', () => {
     }
   }
 
-  /**
-   * addFreeformBlock：在主時間軸憑空新增一個空白或自訂文字的實體區塊。
-   *
-   * 此功能對應「自由輸入與非強制序列化」的設計，originId 刻意設為 null。
-   *
-   * @param label - 區塊顯示文字
-   * @param color - 區塊背景顏色
-   * @param targetSlotIndex - 所在的泳道索引
-   * @param targetCharacterId - 綁定的角色 ID
-   * @param afterIndex - 插入位置
-   */
+  /** 憑空新增空白/自訂文字的實體區塊（自由輸入，originId 設 null）；回傳新 id。 */
   function addFreeformBlock(
     label: string,
     color: string,
@@ -196,10 +152,7 @@ export const useRotationStore = defineStore('rotation', () => {
     return newBlock.id;
   }
 
-  /**
-   * updateLabel：更新主時間軸上某區塊的顯示文字（行內編輯提交）。
-   * 若 trim 後為空字串，視為「放棄此區塊」並直接刪除（對應新增空白區塊後未輸入即失焦）。
-   */
+  /** 更新區塊文字（行內編輯提交）；trim 後為空則視為放棄並刪除該區塊。 */
   function updateLabel(id: string, label: string): void {
     const trimmed = label.trim();
     if (trimmed === '') {
@@ -218,12 +171,8 @@ export const useRotationStore = defineStore('rotation', () => {
   }
 
   /**
-   * insertClonedBlocks：將一組已複製的區塊（通常來自剪貼簿）插入到主時間軸。
-   * 與 addFreeformBlock 不同，此方法會完整保留 originId 與 tags 的血統，
-   * 並且為每個區塊重新賦予全新的 UUID，防止重複貼上造成 ID 衝突。
-   *
-   * @param clonedEntries - 要插入的區塊條目陣列（需為深拷貝後的資料）
-   * @param startInsertAfterIndex - 插入的起始基準索引
+   * 插入一組已複製的區塊（通常來自剪貼簿），保留 originId/tags 血統。
+   * 每個區塊重新賦予新 UUID，防止重複貼上 ID 衝突；回傳新插入的 id 陣列。
    */
   function insertClonedBlocks(
     clonedEntries: RotationEntry[],
@@ -259,10 +208,7 @@ export const useRotationStore = defineStore('rotation', () => {
     return newIds;
   }
 
-  /**
-   * moveBlock：在主時間軸內移動一個區塊（排序操作）。
-   * 允許跨泳道移動，跨泳道時會一併更新 slotIndex 與 characterId。
-   */
+  /** 主軸內移動單一區塊；允許跨泳道（一併更新 slotIndex 與 characterId）。 */
   function moveBlock(
     id: string,
     toInsertAfterIndex: number,
@@ -297,9 +243,8 @@ export const useRotationStore = defineStore('rotation', () => {
   }
 
   /**
-   * moveBlocks：多選整組移動。把 ids 對應的區塊（依目前全域順序、相對順序不變）
-   * 一起移到 toInsertAfterIndex 之後（語意同 moveBlock 的「含全部 entries」after-index）。
-   * 行為近似「插隊解壓縮」：以鼠標錨點為插入點，被選中的區塊整批塞入，各自 slotIndex 不變。
+   * 多選整組移動：ids 對應區塊（保持相對順序）整批移到 toInsertAfterIndex 之後。
+   * 各自 slotIndex 不變；落點若落在被拖群組內則往前退到群組外最近區塊之後。
    */
   function moveBlocks(ids: string[], toInsertAfterIndex: number): void {
     const idSet = new Set(ids);
@@ -307,8 +252,7 @@ export const useRotationStore = defineStore('rotation', () => {
     if (ordered.length === 0) return;
     history.record();
 
-    // 落點錨：從 toInsertAfterIndex 往前找第一個「不在選取集合」的區塊當基準
-    // （落點若落在被拖群組內，往前退到群組外的最近區塊，插在它之後）。
+    // 落點錨：從 toInsertAfterIndex 往前找第一個「不在選取集合」的區塊當基準。
     let anchorId: string | null = null;
     const startIdx = Math.min(toInsertAfterIndex, entries.value.length - 1);
     for (let i = startIdx; i >= 0; i--) {
@@ -329,19 +273,14 @@ export const useRotationStore = defineStore('rotation', () => {
     ];
   }
 
-  /**
-   * deleteBlock：從主時間軸刪除單一區塊。
-   */
+  /** 刪除單一區塊。 */
   function deleteBlock(id: string): void {
     history.record();
     entries.value = removeEntryById(entries.value, id);
     selectedIds.value.delete(id);
   }
 
-  /**
-   * startEditing：標記某區塊進入行內編輯，並以其目前 label 初始化草稿
-   *（新增的空白區塊 label 為空字串）。
-   */
+  /** 標記區塊進入行內編輯，以其目前 label 初始化草稿。 */
   function startEditing(id: string): void {
     editingId.value = id;
     editingDraft.value = entries.value.find((e) => e.id === id)?.block.label ?? '';
@@ -358,11 +297,7 @@ export const useRotationStore = defineStore('rotation', () => {
     editingDraft.value = '';
   }
 
-  /**
-   * deleteSelectedBlocks：批量刪除目前所有被選中的區塊。
-   * 先標記 leavingIds 播放消失動畫，LEAVE_MS 後才真正從 entries 移除
-   *（reduce 動畫偏好或無選取時直接移除）。
-   */
+  /** 批量刪除選中區塊：先標記 leavingIds 播動畫，LEAVE_MS 後移除（reduce 則即刪）。 */
   function deleteSelectedBlocks(): void {
     const idsToDelete = [...selectedIds.value];
     if (idsToDelete.length === 0) return;
@@ -394,17 +329,10 @@ export const useRotationStore = defineStore('rotation', () => {
     selectedIds.value.add(id);
   }
 
-  /**
-   * selectBlocks：批次選取一組區塊（marquee 框選用）。
-   * additive=false 時先清空既有選取；true 則累加到目前選取上。
-   */
+  /** 批次選取一組區塊（框選用）；additive=false 先清空、true 累加。 */
   function selectBlocks(ids: string[], additive: boolean = false): void {
     if (!additive) selectedIds.value.clear();
     ids.forEach((id) => selectedIds.value.add(id));
-  }
-
-  function deselectBlock(id: string): void {
-    selectedIds.value.delete(id);
   }
 
   function clearSelection(): void {
@@ -415,15 +343,7 @@ export const useRotationStore = defineStore('rotation', () => {
     return selectedIds.value.has(id);
   }
 
-  function clearRotation(): void {
-    entries.value = [];
-    selectedIds.value.clear();
-  }
-
-  /**
-   * clearSlot：清空某條泳道（slotIndex）在「所有輸出軸」的區塊，並一併移除選取狀態。
-   * 用於更換泳道角色時清掉舊角色殘留的區塊（換角色＝跨所有輸出軸重開連招）。
-   */
+  /** 清空某泳道在「所有輸出軸」的區塊並移除其選取（換角色＝跨軸重開連招）。 */
   function clearSlot(slotIndex: SlotIndex): void {
     history.record();
     axes.value.forEach((axis) => {
@@ -437,14 +357,9 @@ export const useRotationStore = defineStore('rotation', () => {
     });
   }
 
-  // ──────────────────────────────────────────
-  // 輸出軸（多分頁）管理
-  // ──────────────────────────────────────────
+  // ── 輸出軸（多分頁）管理 ────────────────────
 
-  /**
-   * addAxis：新增一條空白輸出軸並切換為作用中，回傳新軸 id。
-   * 列入歷史：undo 會移除此軸並聚焦回原本作用中的軸。
-   */
+  /** 新增空白輸出軸並切為作用中，回傳新軸 id（列入歷史）。 */
   function addAxis(name: string): string {
     history.record();
     const id = generateUUID();
@@ -453,10 +368,7 @@ export const useRotationStore = defineStore('rotation', () => {
     return id;
   }
 
-  /**
-   * deleteAxis：刪除指定輸出軸；至少保留一條（僅剩一條時為 no-op）。
-   * 刪到作用中軸時，作用中切換到相鄰軸。列入歷史（undo 可救回被刪的軸）。
-   */
+  /** 刪除輸出軸；至少保留一條。刪到作用中軸則切到相鄰軸（列入歷史）。 */
   function deleteAxis(id: string): void {
     if (axes.value.length <= 1) return;
     const index = axes.value.findIndex((a) => a.id === id);
@@ -471,9 +383,7 @@ export const useRotationStore = defineStore('rotation', () => {
     }
   }
 
-  /**
-   * renameAxis：更名輸出軸；名稱去頭尾空白後為空或未變更時不記錄歷史。
-   */
+  /** 更名輸出軸；名稱去空白後為空或未變更時不記錄歷史。 */
   function renameAxis(id: string, name: string): void {
     const trimmed = name.trim();
     const target = axes.value.find((a) => a.id === id);
@@ -484,10 +394,7 @@ export const useRotationStore = defineStore('rotation', () => {
     );
   }
 
-  /**
-   * setActiveAxis：切換作用中輸出軸（純檢視切換，不記錄歷史）。
-   * 切換時清掉選取與編輯態，避免懸空參照到另一條軸的區塊。
-   */
+  /** 切換作用中輸出軸（純檢視，不記歷史）；清掉選取與編輯態避免懸空參照。 */
   function setActiveAxis(id: string): void {
     if (!axes.value.some((a) => a.id === id)) return;
     activeAxisId.value = id;
@@ -519,10 +426,8 @@ export const useRotationStore = defineStore('rotation', () => {
     isLeaving,
     selectBlock,
     selectBlocks,
-    deselectBlock,
     clearSelection,
     isSelected,
-    clearRotation,
     clearSlot,
     addAxis,
     deleteAxis,

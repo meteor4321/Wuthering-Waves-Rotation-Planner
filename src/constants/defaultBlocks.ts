@@ -1,20 +1,15 @@
 // ============================================================
-// defaultBlocks.ts
-// 系統預設的七個基礎招式區塊常數。
-// 這些區塊在側邊欄的「預設區塊」區域中永久顯示，不可刪除。
+// defaultBlocks.ts — 側邊欄「預設區塊」的基礎招式常數（永久顯示、不可刪）。
+//
+// 設計原則：
+//   - id 用靜態 'default-{skill}' 格式（非 UUID），方便比對來源、重整不變。
+//   - color 用中性深色，表明為系統預設而非角色專屬。
+//   - characterId 固定 null（通用，不綁角色）。
 // ============================================================
 
 import type { DefaultBlock } from '../types/block';
 
-/**
- * DEFAULT_BLOCKS：七個基礎招式的預設區塊定義。
- *
- * 設計決策：
- * - id 使用 'default-{skill}' 的靜態格式，不使用 UUID，
- * 方便在任何地方直接比對來源，也避免每次重新整理產生不同 id。
- * - color 使用中性的深色，讓使用者清楚知道這是「系統預設」而非角色專屬。
- * - characterId 固定為 null，代表通用，不綁定任何角色。
- */
+/** 七個基礎招式的預設區塊。 */
 export const DEFAULT_BLOCKS: DefaultBlock[] = [
   {
     id: 'default-A',
@@ -74,8 +69,6 @@ export const DEFAULT_BLOCKS: DefaultBlock[] = [
   },
 ];
 
-/**
- * DEFAULT_BLOCK_MAP：以 id 為鍵的查找表，O(1) 查找效率。
- */
+/** 以 id 為鍵的查找表（O(1)）。 */
 export const DEFAULT_BLOCK_MAP: Record<string, DefaultBlock> =
   Object.fromEntries(DEFAULT_BLOCKS.map((b) => [b.id, b]));
