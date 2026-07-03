@@ -211,6 +211,32 @@
   opacity: 1 !important;
 }
 
+/* 側邊欄區塊（compact）拖出時，浮動分身放大到主軸 rotation-block 尺寸，
+   使拖曳中的克隆與鬆手落地後的實際區塊大小一致（不再是側邊欄縮小版）。
+   關鍵：SortableJS 在浮動分身上「寫死 inline width/height（來源 rect 的 px）」
+   （見 sortable _appendGhost），故必須用 !important 蓋過 inline，只改 CSS 變數無效。
+   高度固定 3rem 對齊主軸；寬度改 auto 讓其依放大後的字級/內距重新貼齊內容寬。
+   DefaultBlockField 的 dragEl 即 .block-chip 本身；CustomBlockField 的 dragEl 為
+   .chip-wrapper（chip 為子孫）。放 @layer 之外避免執行期 class 被 Tailwind purge 誤刪。 */
+.sortable-fallback.block-chip--compact {
+  --chip-height: 3rem;   /* 48px，與主軸非 compact 一致 */
+  --chip-px: 1rem;
+  height: 3rem !important;
+  width: auto !important;
+}
+.sortable-fallback.chip-wrapper {
+  height: auto !important;
+  width: auto !important;
+}
+.sortable-fallback.chip-wrapper .block-chip--compact {
+  --chip-height: 3rem;
+  --chip-px: 1rem;
+}
+.sortable-fallback.block-chip--compact .block-chip__label,
+.sortable-fallback.chip-wrapper .block-chip--compact .block-chip__label {
+  font-size: 1rem;       /* 16px，與主軸一致 */
+}
+
 /* 多選拖曳：只有浮動分身（.sortable-fallback）顯示數量徽章。
    徽章平時在 .rotation-block 內 display:none（見 RotationBlock scoped），
    SortableJS 執行期才動態掛上 .sortable-fallback，原始碼掃不到，故此規則
