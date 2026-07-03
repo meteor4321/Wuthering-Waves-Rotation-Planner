@@ -8,6 +8,7 @@
 import { ref, readonly } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useBoardScroll } from '@/composables/board/useBoardScroll';
+import { showToast } from '@/composables/state/useToast';
 import { deepClone } from '@/utils/deepClone';
 import type { RotationEntry } from '@/types/rotation';
 
@@ -37,6 +38,9 @@ export function useClipboard() {
 
     _clipboardBuffer.value = _buildClipboardItems();
     _hasContent.value = _clipboardBuffer.value.length > 0;
+
+    const n = _clipboardBuffer.value.length;
+    if (n > 0) showToast(n === 1 ? '已複製' : `已複製 ${n} 個區塊`, 'success');
   }
 
   /** 剪下選取（複製後刪除原區塊）；Ctrl+X。 */
