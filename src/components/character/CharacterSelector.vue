@@ -347,7 +347,15 @@ onUnmounted(() => {
               @mouseenter="highlightedIndex = index"
               @click="selectOption(char)"
             >
-              <span class="char-selector__avatar" aria-hidden="true" />
+              <span class="char-selector__avatar" aria-hidden="true">
+                <img
+                  v-if="char.avatar"
+                  class="char-selector__avatar-img"
+                  :src="char.avatar"
+                  alt=""
+                  loading="lazy"
+                />
+              </span>
               <span class="char-selector__option-name">{{ char.nameZh }}</span>
             </li>
           </template>
@@ -520,14 +528,22 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* 角色頭像佔位：暫以方塊呈現，未來換成角色頭像（取代原本的屬性色點） */
+/* 角色頭像：有 avatar 時放縮圖，無則維持灰方塊佔位（背景在 img 缺席時可見）。 */
 .char-selector__avatar {
   flex-shrink: 0;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+}
+
+.char-selector__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ── 星級分組小標題 ─────────────────────────────────────── */
@@ -545,7 +561,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  height: 2.25rem;
+  height: 3.25rem;
   padding: 0 0.625rem;
   border-radius: 3px;
   font-size: 0.8125rem;
