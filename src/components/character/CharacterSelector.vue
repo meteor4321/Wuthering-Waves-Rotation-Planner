@@ -283,19 +283,23 @@ onUnmounted(() => {
       @click="toggleDropdown"
       @keydown="onTriggerKeydown"
     >
-      <span
-        v-if="selectedCharacter"
-        class="char-selector__swatch"
-        :style="{ '--swatch-color': getElementColor(selectedCharacter.element) }"
-        aria-hidden="true"
-      />
-      <span
-        class="char-selector__value"
-        :class="{ 'char-selector__value--placeholder': !selectedCharacter }"
-      >
-        {{ selectedCharacter ? selectedCharacter.nameZh : placeholder }}
-      </span>
-      <span class="char-selector__chevron" aria-hidden="true">▾</span>
+      <!-- 可用 #trigger 插槽完全接管觸發器外觀（如把角色頭像當觸發框）；
+           未提供時退回預設：色點 + 名稱 + 三角。 -->
+      <slot name="trigger" :selected="selectedCharacter" :open="isOpen">
+        <span
+          v-if="selectedCharacter"
+          class="char-selector__swatch"
+          :style="{ '--swatch-color': getElementColor(selectedCharacter.element) }"
+          aria-hidden="true"
+        />
+        <span
+          class="char-selector__value"
+          :class="{ 'char-selector__value--placeholder': !selectedCharacter }"
+        >
+          {{ selectedCharacter ? selectedCharacter.nameZh : placeholder }}
+        </span>
+        <span class="char-selector__chevron" aria-hidden="true">▾</span>
+      </slot>
     </button>
 
     <Teleport to="body">
