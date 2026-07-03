@@ -138,7 +138,7 @@ function laneColor(slot: SlotIndex): string {
   flex-direction: column;
   justify-content: center;
   gap: 0.2rem;
-  width: 8.5rem;
+  width: 10rem;
   height: 100%;
   padding: 0 0.75rem;
   border-right: 1px solid rgba(255, 255, 255, 0.07);

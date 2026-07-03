@@ -399,7 +399,7 @@ async function handleSelectCharacter(characterId: string): Promise<void> {
 <style scoped>
 /* ── CSS 自訂屬性 ────────────────────────────────────────── */
 .swimlane {
-  --header-width: 8.5rem;
+  --header-width: 10rem;
   --lane-height: 4rem;
   --lane-color: rgba(255, 255, 255, 0.18);
   --track-gap: 0.2rem;
@@ -476,8 +476,8 @@ async function handleSelectCharacter(characterId: string): Promise<void> {
 /* 泳道 header 空間有限，將共用的 CharacterSelector 觸發鈕壓成精簡尺寸 */
 .header__selector :deep(.char-selector__trigger) {
   height: 1.75rem;
-  padding: 0 0.5rem;
-  gap: 0.4rem;
+  padding: 0 0.4rem;
+  gap: 0.3rem;
   background-color: rgba(255, 255, 255, 0.04);
   border-radius: 4px;
 }
@@ -485,6 +485,7 @@ async function handleSelectCharacter(characterId: string): Promise<void> {
 .header__selector :deep(.char-selector__value) {
   font-size: 0.75rem;
   font-weight: 500;
+  letter-spacing: 0; /* 取消字距，讓最長角色名（漂泊者・氣動）在窄 header 內完整顯示 */
 }
 
 .header__element {
