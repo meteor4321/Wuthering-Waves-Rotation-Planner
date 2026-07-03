@@ -10,7 +10,7 @@
 
 import { ref } from 'vue';
 import type { SlotIndex } from '@/types/character';
-import { useHistory } from '@/composables/useHistory';
+import { useHistory } from '@/composables/state/useHistory';
 
 // 模組層級單例：整個 App 共用同一份泳道顯示順序。
 const laneOrder = ref<SlotIndex[]>([0, 1, 2]);

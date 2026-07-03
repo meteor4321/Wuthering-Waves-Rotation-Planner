@@ -5,7 +5,7 @@ import { ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { DEFAULT_BLOCKS } from '@/constants/defaultBlocks'
-import { useSidebarDragList } from '@/composables/useSidebarDragList'
+import { useSidebarDragList } from '@/composables/blockDrag/useSidebarDragList'
 import type { DefaultBlock } from '@/types/block'
 
 // 套件要求綁定一個它能自行操作的陣列，不能直接綁常數。

@@ -15,7 +15,7 @@ import type { Block, DefaultBlock, TemplateBlock } from '../types/block';
 import type { SlotIndex } from '../types/character';
 import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
-import { useHistory } from '../composables/useHistory';
+import { useHistory } from '@/composables/state/useHistory';
 
 /** 刪除消失動畫時長(ms)，須與 RotationBlock 的 @keyframes block-leave 一致。 */
 const LEAVE_MS = 180;

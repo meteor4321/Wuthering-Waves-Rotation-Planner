@@ -15,7 +15,7 @@
 // ============================================================
 
 import { useRotationStore } from '@/stores/useRotationStore';
-import { useBoardScroll } from '@/composables/useBoardScroll';
+import { useBoardScroll } from '@/composables/board/useBoardScroll';
 
 export function useBlockNavigation() {
   const rotationStore = useRotationStore();

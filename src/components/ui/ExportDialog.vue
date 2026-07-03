@@ -11,7 +11,7 @@
 // ============================================================
 
 import { ref, watch } from 'vue'
-import { useExportDialog, type ExportMode } from '@/composables/useExportDialog'
+import { useExportDialog, type ExportMode } from '@/composables/state/useExportDialog'
 import { useRotationStore } from '@/stores/useRotationStore'
 
 const { state, submit, cancel } = useExportDialog()

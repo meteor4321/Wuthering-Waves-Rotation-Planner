@@ -7,7 +7,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useCharacterStore } from '@/stores/useCharacterStore'
-import { useSidebarDragList } from '@/composables/useSidebarDragList'
+import { useSidebarDragList } from '@/composables/blockDrag/useSidebarDragList'
 import { getElementColor } from '@/constants/elements'
 import type { TemplateBlock } from '@/types/block'
 

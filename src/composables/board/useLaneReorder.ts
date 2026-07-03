@@ -7,7 +7,7 @@
 // ============================================================
 
 import { reactive, onBeforeUnmount, type Ref } from 'vue';
-import { useLaneOrder } from '@/composables/useLaneOrder';
+import { useLaneOrder } from '@/composables/state/useLaneOrder';
 import { useCharacterStore } from '@/stores/useCharacterStore';
 import { getElementColor } from '@/constants/elements';
 import type { SlotIndex } from '@/types/character';
