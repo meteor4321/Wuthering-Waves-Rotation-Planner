@@ -76,8 +76,8 @@ withDefaults(defineProps<Props>(), {
   cursor: grab;
   user-select: none;
 
-  /* ── 邊框：預設透明，狀態時變色 ─── */
-  border: 1.5px solid transparent;
+  /* ── 邊框：預設透明，狀態時變色（2px 全狀態共用，切換不位移） ─── */
+  border: 2px solid transparent;
 
   /* ── 過渡（border、shadow、transform 三軸） ─── */
   transition:
@@ -142,13 +142,16 @@ withDefaults(defineProps<Props>(), {
     inset 0 0 4px rgba(34, 211, 238, 0.06);
 }
 
-/* ── 狀態：選中（isSelected）───────────────────────────────── */
+/* ── 狀態：選中（isSelected）─────────────────────────────────
+   邊框用全亮青色，外圈再疊一道深色分隔環，使選取框在亮色屬性塊
+   （如氣動 #55FFB5、衍射等）上也清楚跳出；外層雙重光暈加強醒目度。 */
 .block-chip--selected {
-  border-color: rgba(34, 211, 238, 0.85);
+  border-color: #67E8F9;
   box-shadow:
-    0 0 10px rgba(34, 211, 238, 0.30),
-    0 0  3px rgba(34, 211, 238, 0.50),
-    inset 0 0  8px rgba(34, 211, 238, 0.10);
+    0 0 0 1px rgba(8, 12, 24, 0.65),
+    0 0 16px rgba(34, 211, 238, 0.55),
+    0 0  5px rgba(34, 211, 238, 0.80),
+    inset 0 0 10px rgba(34, 211, 238, 0.18);
 }
 
 /* ── 狀態：危險（isDanger）─────────────────────────────────── */
