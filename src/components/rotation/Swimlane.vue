@@ -565,17 +565,19 @@ async function handleDeselectCharacter(): Promise<void> {
   line-height: 1;
   color: rgba(255, 255, 255, 0.35);
 }
-/* hover / 選單開啟：以屬性色（--lane-color）發出明顯光暈，凸顯可點選。 */
+/* hover / 選單開啟：以屬性色（--lane-color）發出光暈 + 放大。
+   強調框用 inset box-shadow 疊在圖片內側（非 border），避免與圖片間留黑縫；
+   inset 支援小數，1.5px 取得 1~2px 之間的粗細。 */
 .header__portrait :deep(.char-selector__trigger:hover) .header__avatar,
 .header__portrait :deep(.char-selector__trigger--open) .header__avatar {
   border-color: var(--lane-color, rgba(34, 211, 238, 0.8));
-  box-shadow: 0 0 0 2px var(--lane-color, rgba(34, 211, 238, 0.5)),
+  box-shadow: inset 0 0 0 1.5px var(--lane-color, rgba(34, 211, 238, 0.8)),
     0 0 12px var(--lane-color, rgba(34, 211, 238, 0.6));
   transform: scale(1.04);
 }
 .header__portrait :deep(.char-selector__trigger:focus-visible) .header__avatar {
   border-color: var(--lane-color, rgba(34, 211, 238, 0.8));
-  box-shadow: 0 0 0 2px var(--lane-color, rgba(34, 211, 238, 0.5));
+  box-shadow: inset 0 0 0 1.5px var(--lane-color, rgba(34, 211, 238, 0.8));
 }
 
 .header__name {
@@ -748,6 +750,7 @@ async function handleDeselectCharacter(): Promise<void> {
 .track__add-btn {
   align-self: center;
   justify-self: start;
+  margin-left: 0.5rem; /* 與前一區塊拉開一點距離，避免緊貼 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -755,9 +758,9 @@ async function handleDeselectCharacter(): Promise<void> {
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 4px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.28);
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
 
   font-size: 0.875rem;
   line-height: 1;
@@ -771,9 +774,9 @@ async function handleDeselectCharacter(): Promise<void> {
 
 .track__add-btn:hover,
 .track__add-btn:focus-visible {
-  border-color: rgba(255, 255, 255, 0.45);
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* 移除瀏覽器預設 focus ring（橘/白外框，非本專案實作）；

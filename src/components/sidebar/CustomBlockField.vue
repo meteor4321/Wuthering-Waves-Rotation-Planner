@@ -200,7 +200,7 @@ onUnmounted(() => {
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.40);
+  color: rgba(255, 255, 255, 0.72);
   user-select: none;
   overflow: hidden;
   white-space: nowrap;
@@ -213,8 +213,8 @@ onUnmounted(() => {
   line-height: 1;
   padding: 0.1875rem 0.375rem;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.10);
-  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0;
   flex-shrink: 0;
 }
@@ -235,7 +235,7 @@ onUnmounted(() => {
 
 .empty-text {
   font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.5);
   user-select: none;
   letter-spacing: 0.03em;
 }

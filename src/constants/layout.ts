@@ -8,4 +8,4 @@
 // ============================================================
 
 /** 主軸區塊間距（px）：泳道 grid gap、匯出視圖 column-gap、FLIP/寬度數學共用。 */
-export const TRACK_GAP_PX = 4;
+export const TRACK_GAP_PX = 2;
