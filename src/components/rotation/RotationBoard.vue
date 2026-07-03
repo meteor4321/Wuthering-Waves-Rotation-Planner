@@ -63,7 +63,8 @@ function measurerLabel(entry: RotationEntry): string {
 }
 
 // 欄寬量測（隱藏量測列 → grid-template-columns；含 entries/草稿/resize/字型重量）
-const { measurerRef, columnWidths, gridTemplate } = useColumnMeasure()
+const measurerRef = ref<HTMLElement | null>(null)
+const { columnWidths, gridTemplate } = useColumnMeasure(measurerRef)
 
 // ── 側邊欄多選拖曳：量測整組來源模板的合計寬度（供落點預覽顯示對齊主軸的
 //    「自動調整寬度」空欄）。隱藏量測列只渲染 chip，量完加上塊間距加總。──

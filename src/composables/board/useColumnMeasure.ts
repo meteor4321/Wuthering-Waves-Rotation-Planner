@@ -7,14 +7,14 @@
 // 供 RotationBoard 使用；量測列 DOM 仍由元件渲染（綁 measurerRef）。
 // ============================================================
 
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, type Ref } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
 
-export function useColumnMeasure() {
+// measurerRef 由元件建立並傳入：元件內以頂層 const ref 綁定 string template ref，
+// 才能被 vue-tsc 認定為「已使用」（避免 noUnusedLocals 誤報 TS6133）。
+export function useColumnMeasure(measurerRef: Ref<HTMLElement | null> = ref(null)) {
   const rotationStore = useRotationStore();
 
-  /** 隱藏量測列容器（元件模板綁定）。 */
-  const measurerRef = ref<HTMLElement | null>(null);
   /** 各全域欄位寬度（px），index 對應 1D entries index。 */
   const columnWidths = ref<number[]>([]);
 
