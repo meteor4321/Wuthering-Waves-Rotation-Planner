@@ -19,7 +19,7 @@ import { ref, computed } from 'vue';
 import { deepClone } from '@/utils/deepClone';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useCharacterStore } from '@/stores/useCharacterStore';
-import { useLaneOrder } from '@/composables/useLaneOrder';
+import { useLaneOrder } from '@/composables/state/useLaneOrder';
 import type { RotationAxis } from '@/types/rotation';
 import type { CharacterSlots, SlotIndex } from '@/types/character';
 

@@ -1,186 +1,47 @@
 // ============================================================
-// useBlockDrag.ts — 全域拖曳協調（module 單例）。
+// useBlockDrag.ts — 全域拖曳協調門面（module 單例，重構 R4 後）。
 //
-// 設計原則：
-//   - SortableJS 僅負責「偵測拖曳 + 浮動分身視覺」；落點/落地全由本檔自製，
+// 三塊職責已拆分（單一職責）：
+//   - blockDrag/state.ts    ：拖曳狀態單例＋區域標記常數＋重置。
+//   - blockDrag/resolver.ts ：落點解析（hit-test 幾何、鄰居中心遲滯）。
+//   - blockDrag/commit.ts   ：落地編排（依鬆手快照寫入 store）。
+// 本檔保留「事件接線」：mousemove 懸停評估（三區判定＋body class）、
+// 起拖/鬆手入口、SortableJS 選項。設計原則不變：
+//   - SortableJS 僅負責「偵測拖曳 + 浮動分身視覺」；落點/落地全自製，
 //     不依賴其 @add/@update index（跨全域排序時不可靠）。
-//   - forceFallback 模式：可見的是靜態浮動克隆 .sortable-fallback（拿不到 Vue
-//     響應式）→ 三區警告樣式改用 <body> 全域 class + CSS 套在克隆上。
-//   - 三區語意：合法落點(泳道) > 可刪除區(主軸面板內非泳道) > 禁止放置區(其餘)。
-//   - 落點 hit-test 全用即時 DOM（游標與區塊同幀讀取），捲動座標自動一致，
-//     免 baseline 補償。
+//   - forceFallback：可見的是靜態浮動克隆 → 警告樣式用 <body> class + CSS。
 // ============================================================
 
-import { reactive, readonly, type DeepReadonly } from 'vue';
+import { readonly, type DeepReadonly } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
-import { useSidebarStore } from '@/stores/useSidebarStore';
 import { useCharacterStore } from '@/stores/useCharacterStore';
 import { generateUUID } from '@/utils/uuid';
 import type { DefaultBlock, TemplateBlock } from '@/types/block';
-import type { RotationEntry, DragSourceType } from '@/types/rotation';
+import type { RotationEntry } from '@/types/rotation';
 import type { SlotIndex } from '@/types/character';
+import {
+  dragStateInternal as _dragState,
+  resetDragState,
+  DROP_ZONE_ATTRIBUTE,
+  DELETE_ZONE_ATTRIBUTE,
+  SIDEBAR_ZONE_ATTRIBUTE,
+  DELETE_ZONE_BODY_CLASS,
+  FORBIDDEN_BODY_CLASS,
+  SIDEBAR_ZONE_BODY_CLASS,
+  type DragState,
+  type SortableEventLike,
+} from '@/composables/blockDrag/state';
+import { resolveAfterIndex, clearHysteresis } from '@/composables/blockDrag/resolver';
+import { commitDrop } from '@/composables/blockDrag/commit';
 
-// 合法放置容器（泳道）需掛上此屬性，供 _handleDragOver 判斷游標是否在合法落點
-export const DROP_ZONE_ATTRIBUTE = 'data-drop-zone';
-// 可刪除區（主軸面板內、三條泳道之外的空白）掛此屬性。
-// 三區語意：合法落點(泳道) > 可刪除區(主軸面板) > 其餘皆為禁止放置區(標題列/側邊欄/版面外)
-export const DELETE_ZONE_ATTRIBUTE = 'data-delete-zone';
-// 側邊欄序列化區（自訂模板面板）掛此屬性。主軸區塊拖到此處放開 → 序列化為角色模板。
-export const SIDEBAR_ZONE_ATTRIBUTE = 'data-sidebar-zone';
-
-export interface SortableEventLike {
-  oldIndex?: number;
-  newIndex?: number;
-  oldDraggableIndex?: number;
-  newDraggableIndex?: number;
-  to?: HTMLElement;   // 放置目標容器
-  from?: HTMLElement; // 拖曳來源容器
-  item?: HTMLElement; // 被拖放的 DOM 元素（跨清單複製時 = SortableJS 插入的克隆節點）
-}
-
-interface DragState {
-  isDragging: boolean;
-  sourceType: DragSourceType | null;
-  draggingId: string | null;
-  // 多選拖曳：整組被拖曳的區塊 id（依全域順序）。單拖時為 [draggingId]。
-  draggingIds: string[];
-  draggingSourceBlock: DefaultBlock | TemplateBlock | null;
-  // 側邊欄多選拖曳：整組來源模板，依「選取先後順序」排列（落地時由左而右解壓縮插入）。
-  // 單拖時為 [draggingSourceBlock]。
-  draggingSourceBlocks: (DefaultBlock | TemplateBlock)[];
-  // 側邊欄拖曳開始時就先產生好的「未來實體 id」，讓拖曳預覽用的暫時物件
-  // 與之後寫入 store 的正式 InstanceBlock 共用同一個 id（key 全程不變，
-  // 避免 SortableJS 追蹤的 DOM 節點被 Vue 中途摧毀重建）
-  pendingInstanceId: string | null;
-  draggingSlotIndex: SlotIndex | null;
-  isOverSidebar: boolean;
-  // 游標不在合法落點（泳道）上：含可刪除區與禁止放置區兩種
-  isOverInvalidZone: boolean;
-  // 游標在可刪除區（主軸面板內、泳道之外）：主軸區塊在此放開才會刪除
-  isOverDeleteZone: boolean;
-  // ── 自製落點預覽（single thread 跨泳道同步擠出）──────────────
-  // 全域 after-index：插在此索引之後（語意同 store moveBlock/instantiateBlock 的 afterIndex；
-  // -1=最前、length-1=最後）。null = 目前無合法落點（游標在泳道外/禁止區/跨泳道）。
-  previewInsertAfterIndex: number | null;
-  // 落點空欄寬度（px）。主軸來源＝被拖區塊原欄寬；側邊欄＝浮動分身寬度。
-  draggingWidth: number;
-  // 落點所在泳道（畫單欄虛框用）。null = 無合法落點。
-  previewSlotIndex: SlotIndex | null;
-}
-
-const _dragState = reactive<DragState>({
-  isDragging: false,
-  sourceType: null,
-  draggingId: null,
-  draggingIds: [],
-  draggingSourceBlock: null,
-  draggingSourceBlocks: [],
-  pendingInstanceId: null,
-  draggingSlotIndex: null,
-  isOverSidebar: false,
-  isOverInvalidZone: false,
-  isOverDeleteZone: false,
-  previewInsertAfterIndex: null,
-  draggingWidth: 0,
-  previewSlotIndex: null,
-});
-
-// 三區警告樣式的 <body> 全域 class（見檔頭設計原則）：
-//   刪除區→紅紋、禁止區→禁止圖標、側邊欄序列化區→拖回存模板樣式。
-const DELETE_ZONE_BODY_CLASS = 'dragging-over-delete';
-const FORBIDDEN_BODY_CLASS = 'dragging-forbidden';
-// 主軸區塊懸停於側邊欄序列化區（拖回存成模板）時的浮動分身樣式
-const SIDEBAR_ZONE_BODY_CLASS = 'dragging-over-sidebar';
-
-// 目前展開中的落點 after-index（遲滯狀態，跨多次評估保留）。null = 目前無落點。
-// 含全部 entries 語意，與 store moveBlock/instantiateBlock 的 afterIndex 一致（-1=最前）。
-let _curAfter: number | null = null;
+// 呼叫端沿用本模組的匯出（Swimlane/RotationBoard/SidebarPanel 等），原樣轉出。
+export { DROP_ZONE_ATTRIBUTE, DELETE_ZONE_ATTRIBUTE, SIDEBAR_ZONE_ATTRIBUTE };
+export type { SortableEventLike };
 
 // 拖曳中最後一次游標座標（視窗座標）。供 notifyAutoScroll 在「游標靜止、內容自動捲動」時，
 // 用同一座標重新評估落點（拿不到新的 mousemove event 時的座標來源）。
 let _lastClientX = 0;
 let _lastClientY = 0;
-
-// 即時讀各「非拖曳區塊」的中心 x（視窗座標），依全域順序回傳。
-function _liveCentersByGlobalIndex(): { gi: number; center: number }[] {
-  const draggingSet = new Set<string>(
-    _dragState.draggingIds.length
-      ? _dragState.draggingIds
-      : _dragState.draggingId
-      ? [_dragState.draggingId]
-      : [],
-  );
-  const centerById = new Map<string, number>();
-  document.querySelectorAll<HTMLElement>('.rotation-block[data-entry-id]').forEach((el) => {
-    const id = el.getAttribute('data-entry-id');
-    if (!id) return;
-    const r = el.getBoundingClientRect();
-    centerById.set(id, r.left + r.width / 2);
-  });
-  const out: { gi: number; center: number }[] = [];
-  const rotationStore = useRotationStore();
-  rotationStore.entries.forEach((e, gi) => {
-    if (draggingSet.has(e.id)) return; // 被拖區塊已隱藏、無有效位置 → 跳過
-    const center = centerById.get(e.id);
-    if (center !== undefined) out.push({ gi, center });
-  });
-  return out;
-}
-
-// 即時定位：游標 x 對應到的全域 after-index（最後一個中心 < clientX 的非拖曳區塊全域索引；-1=最前）。
-function _liveAfterIndexFromX(clientX: number): number {
-  const list = _liveCentersByGlobalIndex();
-  let k = -1;
-  for (const { gi, center } of list) {
-    if (center < clientX) k = gi;
-    else break;
-  }
-  return k;
-}
-
-// 合法 after-index 落點集合（升冪）：-1（最前）＋各非拖曳區塊的全域索引（其後）。
-function _insertionPoints(): number[] {
-  return [-1, ..._liveCentersByGlobalIndex().map((c) => c.gi)];
-}
-
-// 遲滯解析：游標仍在 [左鄰中心 - M, 右鄰中心 + M] 之間就維持當前落點，跨出才換格。
-// 界線用鄰居中心（非被拖物寬度）→ 消除窄拖寬/寬拖窄的不對稱閃爍；
-// 兩側再各留 M px 緩衝帶，吸收游標停在中心附近的手抖/次像素位移，避免臨界來回跳格閃爍。
-function _resolveAfterIndex(clientX: number): number {
-  if (_curAfter === null) {
-    _curAfter = _liveAfterIndexFromX(clientX);
-    return _curAfter;
-  }
-  const list = _liveCentersByGlobalIndex();
-  // 左鄰中心＝afterIndex 對應區塊中心（afterIndex=-1 則無左鄰）；
-  // 右鄰中心＝afterIndex 之後第一個非拖曳區塊中心（超出陣列則無右鄰）。
-  const cur = _curAfter as number;
-  const leftCenter = list.find((c) => c.gi === cur)?.center;
-  const rightCenter = list.find((c) => c.gi > cur)?.center;
-  if (list.length === 0) {
-    // 無任何鄰居可比對（例如整列都在拖曳中）→ 即時定位
-    _curAfter = _liveAfterIndexFromX(clientX);
-    return _curAfter;
-  }
-  // 維持區間 = [左鄰中心 - M, 右鄰中心 + M]：以鄰居中心為界、兩側各外擴 M px 緩衝帶。
-  // 換格後游標會安穩落在新區間內、不立即反向跳回 → 消除臨界閃爍。
-  const M = 2;
-  const okLeft = leftCenter === undefined || clientX >= leftCenter - M;
-  const okRight = rightCenter === undefined || clientX <= rightCenter + M;
-  if (okLeft && okRight) {
-    return _curAfter; // 游標仍在緩衝區間內 → 維持
-  }
-  const cand = _liveAfterIndexFromX(clientX);
-  const pts = _insertionPoints();
-  if (!okRight) {
-    const next = pts.find((p) => p > cur);
-    _curAfter = Math.max(cand, next ?? cur);
-  } else {
-    const prev = [...pts].reverse().find((p) => p < cur);
-    _curAfter = Math.min(cand, prev ?? cur);
-  }
-  return _curAfter;
-}
 
 function _handleDragOver(event: MouseEvent): void {
   if (!_dragState.isDragging) return;
@@ -198,7 +59,7 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
 
   // ── 前置：主軸區塊懸停於側邊欄序列化區 → 「拖回存成模板」落點（4.4d）──
   // 走獨立分支：不畫禁止/刪除、不算主軸排序落點，僅標記 isOverSidebar 供 handleDragEnd
-  // 走 serializeToTemplate。只對主軸來源生效（側邊欄來源拖回側邊欄無意義，維持禁止）。
+  // 走 serializeManyToTemplates。只對主軸來源生效（側邊欄來源拖回側邊欄無意義，維持禁止）。
   const overSidebar = isRotationSource && !!target?.closest(`[${SIDEBAR_ZONE_ATTRIBUTE}]`);
   _dragState.isOverSidebar = overSidebar;
   if (overSidebar) {
@@ -206,7 +67,7 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
     _dragState.isOverDeleteZone = false;
     _dragState.previewInsertAfterIndex = null;
     _dragState.previewSlotIndex = null;
-    _curAfter = null;
+    clearHysteresis();
     document.body.classList.remove(DELETE_ZONE_BODY_CLASS);
     document.body.classList.remove(FORBIDDEN_BODY_CLASS);
     document.body.classList.add(SIDEBAR_ZONE_BODY_CLASS);
@@ -237,13 +98,13 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
   if (!overValid) {
     _dragState.previewInsertAfterIndex = null;
     _dragState.previewSlotIndex = null;
-    _curAfter = null; // 離開合法落點 → 清遲滯，再入時重新即時定位
+    clearHysteresis(); // 離開合法落點 → 清遲滯，再入時重新即時定位
     return;
   }
 
   if (isRotationSource) {
     // 主軸來源：歸屬泳道不變、全域位置可任意（不分泳道行）；虛框畫在自己泳道。
-    _dragState.previewInsertAfterIndex = _resolveAfterIndex(clientX);
+    _dragState.previewInsertAfterIndex = resolveAfterIndex(clientX);
     _dragState.previewSlotIndex = _dragState.draggingSlotIndex;
   } else {
     // 側邊欄來源：落點 x 同樣全域，但歸屬泳道＝游標所在泳道（需角色匹配）。
@@ -253,7 +114,7 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
     if (slotIndex === null) {
       _dragState.previewInsertAfterIndex = null;
       _dragState.previewSlotIndex = null;
-      _curAfter = null;
+      clearHysteresis();
       return;
     }
     const characterStore = useCharacterStore();
@@ -262,10 +123,10 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
     if (!charId || (src && src.characterId !== null && src.characterId !== charId)) {
       _dragState.previewInsertAfterIndex = null;
       _dragState.previewSlotIndex = null;
-      _curAfter = null;
+      clearHysteresis();
       return;
     }
-    _dragState.previewInsertAfterIndex = _resolveAfterIndex(clientX);
+    _dragState.previewInsertAfterIndex = resolveAfterIndex(clientX);
     _dragState.previewSlotIndex = slotIndex;
   }
 }
@@ -303,33 +164,17 @@ function _detachDragOverListener(): void {
   _isDragOverListenerAttached = false;
 }
 
-function _resetDragState(): void {
-  _dragState.isDragging = false;
-  _dragState.sourceType = null;
-  _dragState.draggingId = null;
-  _dragState.draggingIds = [];
-  _dragState.draggingSourceBlock = null;
-  _dragState.draggingSourceBlocks = [];
-  _dragState.pendingInstanceId = null;
-  _dragState.draggingSlotIndex = null;
-  _dragState.isOverSidebar = false;
-  _dragState.isOverInvalidZone = false;
-  _dragState.isOverDeleteZone = false;
-  _dragState.previewInsertAfterIndex = null;
-  _dragState.draggingWidth = 0;
-  _dragState.previewSlotIndex = null;
-  _curAfter = null;
+// 完整收尾：重置狀態欄位＋body class（state.ts）、清遲滯（resolver）、卸監聽、清座標。
+function _teardown(): void {
+  resetDragState();
+  clearHysteresis();
   _lastClientX = 0;
   _lastClientY = 0;
-  document.body.classList.remove(DELETE_ZONE_BODY_CLASS);
-  document.body.classList.remove(FORBIDDEN_BODY_CLASS);
-  document.body.classList.remove(SIDEBAR_ZONE_BODY_CLASS);
   _detachDragOverListener();
 }
 
 export function useBlockDrag() {
   const rotationStore = useRotationStore();
-  const sidebarStore = useSidebarStore();
   const characterStore = useCharacterStore();
   // 顯式標註對外型別，避免 readonly() 的型別推論在部分 Volar 版本展開
   // DeepReadonly<UnwrapNestedRefs<…>> 時掉欄位（如 draggingIds 誤判不存在）。
@@ -404,73 +249,28 @@ export function useBlockDrag() {
 
   // 側邊欄拖入與同泳道重排的落地全由 handleDragEnd 統一處理（自製全域落點）：
   //  - 不依賴 SortableJS 的 @add/@update index（跨全域排序時 @update 不觸發＝p10-3）。
-  //  - 落地與 _resetDragState 同一個 setTimeout，使 store 更新與 isDragging 轉 false 同拍
+  //  - 落地與 _teardown 同一個 setTimeout，使 store 更新與 isDragging 轉 false 同拍
   //    批次渲染，避免鬆手瞬間先 reset 回原佈局再寫 store 的中間幀閃爍（n9）。
   function handleDragEnd(_event?: SortableEventLike): void {
     if (!_dragState.isDragging) return;
     // 快照所有落地所需資料（setTimeout 內 _dragState 已被重置）
-    const sourceType = _dragState.sourceType;
-    const draggingId = _dragState.draggingId;
-    const draggingIds = [..._dragState.draggingIds];
-    const sourceBlock = _dragState.draggingSourceBlock;
-    const sourceBlocks = [..._dragState.draggingSourceBlocks];
-    const isOverSidebar = _dragState.isOverSidebar;
-    const isOverDeleteZone = _dragState.isOverDeleteZone;
-    const afterIn = _dragState.previewInsertAfterIndex; // 含全部 entries 的全域 after-index
-    const previewSlot = _dragState.previewSlotIndex;
-    const pendingId = _dragState.pendingInstanceId ?? undefined;
+    const snapshot = {
+      sourceType: _dragState.sourceType,
+      draggingId: _dragState.draggingId,
+      draggingIds: [..._dragState.draggingIds],
+      sourceBlock: _dragState.draggingSourceBlock,
+      sourceBlocks: [..._dragState.draggingSourceBlocks],
+      isOverSidebar: _dragState.isOverSidebar,
+      isOverDeleteZone: _dragState.isOverDeleteZone,
+      afterIn: _dragState.previewInsertAfterIndex, // 含全部 entries 的全域 after-index
+      previewSlot: _dragState.previewSlotIndex,
+      pendingId: _dragState.pendingInstanceId ?? undefined,
+    };
 
     // setTimeout：避免打斷 SortableJS 同步清理導致 dragEl 殘留（p1-1）；且與 reset 同拍消除 n9 閃爍。
     setTimeout(() => {
-      if (sourceType === 'rotation-instance' && draggingId) {
-        const isMulti = draggingIds.length > 1;
-        if (isOverSidebar) {
-          // 拖回模板庫：多選整組一起序列化（批量去重＋彙總 toast），單顆亦走同路徑。
-          const ids = isMulti ? draggingIds : [draggingId];
-          const blocks = ids
-            .map((id) => rotationStore.entries.find((e) => e.id === id)?.block)
-            .filter((b): b is NonNullable<typeof b> => !!b);
-          if (blocks.length) sidebarStore.serializeManyToTemplates(blocks);
-        } else if (afterIn !== null) {
-          // 全域重排：afterIn 已是「含全部」語意。多選整組以鼠標錨點插入、相對順序不變。
-          if (isMulti) rotationStore.moveBlocks(draggingIds, afterIn);
-          else rotationStore.moveBlock(draggingId, afterIn);
-        } else if (isOverDeleteZone) {
-          // 無合法落點且在可刪除區 → 刪除（多選刪整組）；禁止放置區一律彈回不刪
-          if (isMulti) draggingIds.forEach((id) => rotationStore.deleteBlock(id));
-          else rotationStore.deleteBlock(draggingId);
-        }
-      } else if (sourceBlock && afterIn !== null && previewSlot !== null) {
-        // 側邊欄來源落入泳道：再次角色校驗（雙重防線），用 previewSlot 決定歸屬泳道。
-        const targetCharacterId = characterStore.getCharacterIdBySlot(previewSlot);
-        if (targetCharacterId) {
-          if (sourceBlocks.length > 1) {
-            // 模板庫多選拖入：依「選取先後順序」由左而右解壓縮，逐一插在落點之後。
-            // 跨泳道：每個模板依自己的 characterId 自動分流到對應泳道（非過濾），
-            //   行為對齊主軸跨泳道多選。各塊用全新 id（不共用 pendingId）。
-            // characterId 為 null（通用）的模板落入游標所在的目標泳道。
-            let insertAt = afterIn;
-            for (const b of sourceBlocks) {
-              const slot =
-                b.characterId === null
-                  ? previewSlot
-                  : characterStore.getSlotByCharacterId(b.characterId);
-              if (slot === null) continue; // 該角色目前不在任何泳道 → 略過
-              const charId = characterStore.getCharacterIdBySlot(slot);
-              if (!charId) continue;
-              rotationStore.instantiateBlock(b, slot, charId, insertAt);
-              insertAt++;
-            }
-            sidebarStore.clearTemplateSelection();
-          } else if (
-            sourceBlock.characterId === null ||
-            sourceBlock.characterId === targetCharacterId
-          ) {
-            rotationStore.instantiateBlock(sourceBlock, previewSlot, targetCharacterId, afterIn, pendingId);
-          }
-        }
-      }
-      _resetDragState();
+      commitDrop(snapshot);
+      _teardown();
     }, 0);
   }
 

@@ -9,7 +9,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { CharacterSlots, SlotIndex } from '../types/character';
 import { WUWA_CHARACTERS, CHARACTER_MAP } from '../constants/characters';
-import { useHistory } from '../composables/useHistory';
+import { useHistory } from '@/composables/state/useHistory';
 
 export const useCharacterStore = defineStore('character', () => {
   /** 三個角色槽狀態（tuple 固定長度 3，對應三條泳道）；初始均未選角。 */

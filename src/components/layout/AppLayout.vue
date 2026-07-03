@@ -9,7 +9,7 @@
 // ============================================================
 
 import { computed } from 'vue'
-import { useSidebarCollapse } from '@/composables/useSidebarCollapse'
+import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse'
 
 interface Props {
   /** 側邊欄固定寬度（px） */

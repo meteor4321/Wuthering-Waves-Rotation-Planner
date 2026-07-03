@@ -11,7 +11,7 @@
 // ============================================================
 
 import { nextTick, ref, watch } from 'vue'
-import { useDialog } from '@/composables/useDialog'
+import { useDialog } from '@/composables/state/useDialog'
 
 const { state, handleConfirm, handleCancel } = useDialog()
 

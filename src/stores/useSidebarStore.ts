@@ -10,7 +10,7 @@ import type { TemplateBlock, InstanceBlock } from '../types/block';
 import { DEFAULT_BLOCKS } from '../constants/defaultBlocks';
 import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
-import { showToast as showGlobalToast, type ToastVariant } from '../composables/useToast';
+import { showToast as showGlobalToast, type ToastVariant } from '@/composables/state/useToast';
 
 /** LocalStorage 儲存鍵名 */
 const STORAGE_KEY = 'wuwa-rotation-templates';

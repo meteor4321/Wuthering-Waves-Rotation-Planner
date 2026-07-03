@@ -8,7 +8,7 @@
 // 此元件本身為無狀態的純呈現層，所有顯示邏輯由 composable 控制。
 // ============================================================
 
-import { useToast } from '@/composables/useToast'
+import { useToast } from '@/composables/state/useToast'
 
 const { toastState, hideToast } = useToast()
 

@@ -15,14 +15,11 @@ import type { Block, DefaultBlock, TemplateBlock } from '../types/block';
 import type { SlotIndex } from '../types/character';
 import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
-import { useHistory } from '../composables/useHistory';
+import { useHistory } from '@/composables/state/useHistory';
 
 /** 刪除消失動畫時長(ms)，須與 RotationBlock 的 @keyframes block-leave 一致。 */
 const LEAVE_MS = 180;
-/** 是否偏好減少動畫（reduce 時略過刪除動畫、直接移除）。 */
-const _reducedMotion =
-  typeof window !== 'undefined' &&
-  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+import { prefersReducedMotion } from '../utils/reducedMotion';
 import {
   insertEntryAfterIndex,
   removeEntryById,
@@ -305,7 +302,7 @@ export const useRotationStore = defineStore('rotation', () => {
     // 立即清除選取，讓區塊在消失動畫期間呈現未選取樣式
     selectedIds.value.clear();
 
-    if (_reducedMotion) {
+    if (prefersReducedMotion()) {
       entries.value = removeEntriesByIds(entries.value, idsToDelete);
       return;
     }

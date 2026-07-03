@@ -7,7 +7,7 @@
 
 import { ref, readonly } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
-import { useBoardScroll } from '@/composables/useBoardScroll';
+import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { deepClone } from '@/utils/deepClone';
 import type { RotationEntry } from '@/types/rotation';
 

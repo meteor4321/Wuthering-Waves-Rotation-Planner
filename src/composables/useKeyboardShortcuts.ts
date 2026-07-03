@@ -21,9 +21,9 @@
 import { onMounted, onUnmounted } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useClipboard } from '@/composables/useClipboard';
-import { useBlockNavigation } from '@/composables/useBlockNavigation';
-import { useSidebarCollapse } from '@/composables/useSidebarCollapse';
-import { useHistory } from '@/composables/useHistory';
+import { useBlockNavigation } from '@/composables/board/useBlockNavigation';
+import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse';
+import { useHistory } from '@/composables/state/useHistory';
 
 export function useKeyboardShortcuts() {
   const rotationStore = useRotationStore();

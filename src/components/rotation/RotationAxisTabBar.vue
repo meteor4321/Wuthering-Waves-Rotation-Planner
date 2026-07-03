@@ -11,7 +11,7 @@
 import { nextTick, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useRotationStore } from '@/stores/useRotationStore'
-import { useDialog } from '@/composables/useDialog'
+import { useDialog } from '@/composables/state/useDialog'
 
 const rotationStore = useRotationStore()
 const { confirm, prompt } = useDialog()
