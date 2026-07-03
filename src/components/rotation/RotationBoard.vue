@@ -2,24 +2,33 @@
 // ============================================================
 // RotationBoard.vue — 主時間軸面板：三條 Swimlane 的總容器。
 //
-// 職責：
-//   - 讀選角/entries，依 slotIndex 分流到三泳道。
-//   - 共用 CSS Grid 欄位對齊（隱藏量測列量欄寬）+ 拖曳落點預覽（含多選 FLIP）。
-//   - 跨三泳道矩形框選（marquee）、拖曳邊緣自動捲動、泳道垂直拖曳重排。
+// 職責（R5 拆分後）：本檔只保留「組裝與落點預覽/FLIP」；
+//   - 欄寬量測      → useColumnMeasure
+//   - 邊緣自動捲動  → useEdgeAutoScroll
+//   - 矩形框選      → useMarquee
+//   - 泳道垂直拖曳  → useLaneReorder
+//   - 泳道分流/欄序 → useLaneLayout
 //
 // 設計原則：區塊拖曳由 Swimlane 內 SortableJS 處理；框選刻意與其完全隔離
 //           （掛 window bubble、按在區塊上讓位），避免互搶事件。
 // ============================================================
 
-import { computed, onMounted, onBeforeUnmount, nextTick, reactive, ref, watch } from 'vue'
+import { computed, onMounted, nextTick, ref, watch } from 'vue'
 import Swimlane from '@/components/rotation/Swimlane.vue'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useRotationStore } from '@/stores/useRotationStore'
 import { useLaneOrder } from '@/composables/useLaneOrder'
+import { useLaneLayout } from '@/composables/useLaneLayout'
+import { useColumnMeasure } from '@/composables/useColumnMeasure'
+import { useEdgeAutoScroll } from '@/composables/useEdgeAutoScroll'
+import { useMarquee } from '@/composables/useMarquee'
+import { useLaneReorder } from '@/composables/useLaneReorder'
 import { useHistory } from '@/composables/useHistory'
 import { DELETE_ZONE_ATTRIBUTE, useBlockDrag } from '@/composables/useBlockDrag'
 import { getElementColor } from '@/constants/elements'
+import { TRACK_GAP_PX } from '@/constants/layout'
+import { prefersReducedMotion } from '@/utils/reducedMotion'
 import type { SlotIndex } from '@/types/character'
 import type { RotationEntry } from '@/types/rotation'
 
@@ -27,7 +36,7 @@ import type { RotationEntry } from '@/types/rotation'
 
 const characterStore = useCharacterStore()
 const rotationStore = useRotationStore()
-const { laneOrder, setOrderByMove } = useLaneOrder()
+const { laneOrder } = useLaneOrder()
 const { dragState, notifyAutoScroll } = useBlockDrag()
 const history = useHistory()
 
@@ -36,23 +45,11 @@ const history = useHistory()
 // slots[si].slotIndex === si，故直接映射即可。entries / 欄位對齊全不受影響。
 const orderedSlots = computed(() => laneOrder.value.map((si) => characterStore.slots[si]))
 
-// ── 依 slotIndex 分配 entries ────────────────────────────────
+// ── 依 slotIndex 分流 + 單線程欄位對齊（共用 useLaneLayout，R2）──
 
-const entriesBySlot = computed<Record<SlotIndex, RotationEntry[]>>(() => {
-  const map: Record<SlotIndex, RotationEntry[]> = { 0: [], 1: [], 2: [] }
-  for (const entry of rotationStore.entries) {
-    map[entry.slotIndex as SlotIndex].push(entry)
-  }
-  return map
-})
-
-// ── 單線程欄位對齊（共用 CSS Grid）───────────────────────────
-
-const idToColumnIndex = computed<Map<string, number>>(() => {
-  const map = new Map<string, number>()
-  rotationStore.entries.forEach((entry, index) => map.set(entry.id, index))
-  return map
-})
+const { entriesBySlot, idToColumn: idToColumnIndex } = useLaneLayout(
+  () => rotationStore.entries,
+)
 
 function measurerColor(entry: RotationEntry): string {
   // 量測列為隱藏列，僅用於量欄寬，顏色不影響結果；沿用屬性色保持一致。
@@ -65,25 +62,8 @@ function measurerLabel(entry: RotationEntry): string {
   return entry.id === rotationStore.editingId ? rotationStore.editingDraft : entry.block.label
 }
 
-const measurerRef = ref<HTMLElement | null>(null)
-const columnWidths = ref<number[]>([])
-
-const gridTemplate = computed<string>(() =>
-  columnWidths.value.map((w) => `${w}px`).join(' '),
-)
-
-function measure(): void {
-  const el = measurerRef.value
-  if (!el) return
-  columnWidths.value = Array.from(el.children).map(
-    (child) => (child as HTMLElement).getBoundingClientRect().width,
-  )
-}
-
-async function remeasureAfterRender(): Promise<void> {
-  await nextTick()
-  measure()
-}
+// 欄寬量測（隱藏量測列 → grid-template-columns；含 entries/草稿/resize/字型重量）
+const { measurerRef, columnWidths, gridTemplate } = useColumnMeasure()
 
 // ── 側邊欄多選拖曳：量測整組來源模板的合計寬度（供落點預覽顯示對齊主軸的
 //    「自動調整寬度」空欄）。隱藏量測列只渲染 chip，量完加上塊間距加總。──
@@ -109,17 +89,13 @@ watch(
   { deep: false },
 )
 
-watch(() => rotationStore.entries, remeasureAfterRender, { deep: true })
-// 行內編輯草稿變動時也重新量測，讓編輯中的區塊即時變寬
-watch(() => rotationStore.editingDraft, remeasureAfterRender)
-
 // ── 拖曳落點預覽（single thread 跨泳道同步擠出，含多選）─────────
 
 const PREVIEW_PLACEHOLDER = '__preview_placeholder__'
 
-// 區塊間距（px）：把「欄序」換算成像素 x 位移（FLIP 平滑順延、落點寬度加總）。
-// 注意：目前與 Swimlane 的 --track-gap(0.2rem) 不一致，待統一為單一來源（見重構清單 R1）。
-const TRACK_GAP = 6
+// 區塊間距：與 Swimlane 的 --track-gap / 匯出視圖共用單一常數（constants/layout.ts），
+// 把「欄序」換算成像素 x 位移（FLIP 平滑順延、落點寬度加總）時幾何模型與渲染一致。
+const TRACK_GAP = TRACK_GAP_PX
 
 const isPreviewing = computed<boolean>(
   () => dragState.isDragging && dragState.previewInsertAfterIndex !== null,
@@ -203,9 +179,6 @@ const previewIdToColumn = computed<Map<string, number>>(() => previewLayout.valu
 // 算、不量 DOM → 不觸發 reflow。只動「非被拖」區塊，不與 SortableJS 佔用的 transform 衝突。
 const FLIP_MS = 140
 let _flipPrevX: Map<string, number> | null = null
-const _reducedMotion =
-  typeof window !== 'undefined' &&
-  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 // 以目前「靜止」佈局（無落點空欄）建立 id→x 基準，供拖曳首幀動畫起點。
 function restingIdToX(): Map<string, number> {
@@ -219,7 +192,7 @@ function restingIdToX(): Map<string, number> {
 }
 
 function runFlip(newX: Map<string, number> | null): void {
-  if (_reducedMotion) return
+  if (prefersReducedMotion()) return
   if (!dragState.isDragging || !newX) {
     _flipPrevX = null
     return
@@ -261,184 +234,32 @@ function clearFlipStyles(): void {
 
 watch(() => previewLayout.value, (layout) => runFlip(layout.idToX), { flush: 'post' })
 
-// ── 跨三泳道矩形框選（marquee）─────────────────────────────
-// 與區塊拖曳徹底隔離：掛 window bubble mousedown（不搶 SortableJS）、按在互動元素上
-// 直接 return、位移超過閾值才啟動、進行中才掛 window mousemove/mouseup。
+// ── 邊緣自動捲動 / 框選（R5 抽離）───────────────────────────
 
 const boardScrollRef = ref<HTMLElement | null>(null)
 
-// ── 拖曳邊緣自動捲動 ─────────────────────────────────────────
-// 拖曳中游標超出 .board__scroll 左/右邊緣時，RAF 迴圈持續改 scrollLeft，並呼叫
-// notifyAutoScroll() 重算落點。兩側觸發位置不對稱 → 速度模型不同（體感皆「慢→快」）：
-//   ‧ 右側＝視窗右緣（物理牆）：時間式二次方加速（停留越久越快）。
-//   ‧ 左側＝泳道 header 右緣（開放空間）：距離式緩衝（越往畫面左緣越快，LEFT_RAMP_PX 為到頂距離）。
-const EDGE_TOL = 4        // 右側視為「超出範圍」的容差（px）
-const LEFT_RAMP_PX = 140  // 左側：游標越過 header 右緣多遠時加速到頂（px）＝緩衝帶寬度
-const MIN_STEP = 4        // 剛進入觸發區的起始速度（px/幀）
-const MAX_STEP = 20       // 加速到頂的速度（px/幀）
-const ACCEL_MS = 1000     // 右側：從 MIN_STEP 漸進加速到 MAX_STEP 所需的停留時間(ms)
-let _rafId = 0
-let _edgeClientX = Number.NaN  // 尚未收到 mousemove 前為 NaN → 下方比較皆 false → 不捲動
-let _accelStart = 0            // 右側時間式加速的起始時間戳（0 = 目前不在右側觸發區）
-
-function onDragMouseMove(event: MouseEvent): void {
-  _edgeClientX = event.clientX
-}
-
-function autoScrollTick(): void {
-  const el = boardScrollRef.value
-  if (el) {
-    const rect = el.getBoundingClientRect()
-    // 左界用泳道 sticky header 的右緣：header 蓋在軌道左側（sticky left:0、z-index:5），
-    // 視覺上的軌道左邊界＝header 右緣，而非 board 左緣。游標移到 header 右緣以左即往左捲。
-    const header = el.querySelector('.swimlane__header')
-    const leftBound = header ? header.getBoundingClientRect().right : rect.left + EDGE_TOL
-
-    let dir = 0
-    let step = 0
-    // NaN（未移動）時兩式皆 false → dir 維持 0。
-    if (_edgeClientX <= leftBound) {
-      // 左側：距離式緩衝。距 header 右緣越遠（越往畫面左緣）越快，二次方緩動。
-      dir = -1
-      _accelStart = 0 // 左側不用時間式，清掉右側殘留的計時，避免切換側時殘留加速
-      const f = Math.min(1, (leftBound - _edgeClientX) / LEFT_RAMP_PX)
-      step = MIN_STEP + (MAX_STEP - MIN_STEP) * f * f
-    } else if (_edgeClientX >= rect.right - EDGE_TOL) {
-      // 右側：時間式加速（游標頂著畫面右緣，靠停留時間計量）。
-      dir = 1
-      const now = performance.now()
-      if (_accelStart === 0) _accelStart = now // 剛進入右側觸發區 → 從慢速重新起步
-      const t = Math.min(1, (now - _accelStart) / ACCEL_MS)
-      step = MIN_STEP + (MAX_STEP - MIN_STEP) * t * t
-    } else {
-      _accelStart = 0 // 離開觸發區 → 重置右側加速，下次重新從慢速起步
-    }
-
-    if (dir !== 0) {
-      const before = el.scrollLeft
-      el.scrollLeft += dir * step // 瀏覽器自動 clamp 到 [0, scrollWidth-clientWidth]
-      const delta = el.scrollLeft - before
-      if (delta !== 0) notifyAutoScroll()
-    }
-  }
-  _rafId = requestAnimationFrame(autoScrollTick)
-}
-
-function startAutoScroll(): void {
-  if (_rafId) return
-  _edgeClientX = Number.NaN
-  _accelStart = 0
-  window.addEventListener('mousemove', onDragMouseMove)
-  _rafId = requestAnimationFrame(autoScrollTick)
-}
-
-function stopAutoScroll(): void {
-  if (_rafId) cancelAnimationFrame(_rafId)
-  _rafId = 0
-  window.removeEventListener('mousemove', onDragMouseMove)
-}
+// 拖曳邊緣自動捲動：每次實際捲動後重算拖曳落點
+const autoScroll = useEdgeAutoScroll(boardScrollRef, notifyAutoScroll)
 
 watch(
   () => dragState.isDragging,
   (now) => {
     if (now) {
-      startAutoScroll()
+      autoScroll.start()
       _flipPrevX = restingIdToX() // 種下基準，讓首次落點變動就能從靜止位置滑出
     } else {
-      stopAutoScroll()
+      autoScroll.stop()
       _flipPrevX = null
       setTimeout(clearFlipStyles, FLIP_MS + 40) // 等收尾動畫播完再清除殘留 inline 樣式
     }
   },
 )
 
-const marquee = ref<{ active: boolean; left: number; top: number; width: number; height: number }>({
-  active: false, left: 0, top: 0, width: 0, height: 0,
+// 跨三泳道矩形框選：與區塊拖曳徹底隔離（拖曳中停用；命中結果寫入選取）
+const { marquee } = useMarquee({
+  enabled: () => !dragState.isDragging,
+  onSelect: (ids, additive) => rotationStore.selectBlocks(ids, additive),
 })
-let _mqStartX = 0
-let _mqStartY = 0
-let _mqAdditive = false
-let _mqArmed = false
-let _mqActive = false
-let _justMarqueed = false
-
-function onScrollMouseDown(event: MouseEvent): void {
-  if (event.button !== 0) return
-  if (dragState.isDragging) return
-  const t = event.target as Element | null
-  if (!t) return
-  // 框選起手區：主軸捲動容器空白處，或頂部標題列空白處。
-  // 刻意不含側邊欄（避免與側邊欄拖曳/捲動互搶）。掛在 window bubble，於 target
-  // 自身處理（SortableJS 起拖）之後才跑，故不會搶走區塊拖曳。
-  if (!t.closest('.board__scroll, .app-header')) return
-  // 按在區塊/互動元素上 → 讓位給 SortableJS（不搶事件）
-  if (t.closest('.rotation-block, button, input, textarea, [role="combobox"], .char-selector__listbox')) {
-    return
-  }
-  _mqStartX = event.clientX
-  _mqStartY = event.clientY
-  _mqAdditive = event.ctrlKey || event.metaKey
-  _mqArmed = true
-  _mqActive = false
-  window.addEventListener('mousemove', onMarqueeMove)
-  window.addEventListener('mouseup', onMarqueeUp)
-}
-
-function onMarqueeMove(event: MouseEvent): void {
-  if (!_mqArmed) return
-  const dx = event.clientX - _mqStartX
-  const dy = event.clientY - _mqStartY
-  if (!_mqActive && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
-  _mqActive = true
-  marquee.value = {
-    active: true,
-    left: Math.min(_mqStartX, event.clientX),
-    top: Math.min(_mqStartY, event.clientY),
-    width: Math.abs(dx),
-    height: Math.abs(dy),
-  }
-}
-
-function onMarqueeUp(): void {
-  window.removeEventListener('mousemove', onMarqueeMove)
-  window.removeEventListener('mouseup', onMarqueeUp)
-
-  if (_mqActive) {
-    const r = marquee.value
-    const right = r.left + r.width
-    const bottom = r.top + r.height
-    const hit: string[] = []
-    document.querySelectorAll<HTMLElement>('.rotation-block[data-entry-id]').forEach((el) => {
-      const b = el.getBoundingClientRect()
-      if (b.left < right && b.right > r.left && b.top < bottom && b.bottom > r.top) {
-        const id = el.getAttribute('data-entry-id')
-        if (id) hit.push(id)
-      }
-    })
-    rotationStore.selectBlocks(hit, _mqAdditive)
-    _justMarqueed = true
-    // 防呆：terminal click 會在 mouseup 後同步派發、被 onGlobalClickCapture 消化；
-    // 但若 click 始終沒派發（例如鬆手在瀏覽器視窗外），旗標需自行清除，
-    // 以免殘留而誤吞下一次正常點擊。
-    setTimeout(() => { _justMarqueed = false }, 0)
-  }
-
-  _mqArmed = false
-  _mqActive = false
-  marquee.value = { active: false, left: 0, top: 0, width: 0, height: 0 }
-}
-
-// 框選剛結束時，攔截緊接的 click（避免 App.vue root @click 清掉剛選取的區塊）。
-// 必須掛在 window capture：放開點在 .rotation-board 外時（例如往上框選最頂泳道、
-// 在 board 上緣外鬆手），terminal click 的事件路徑不經過 .rotation-board，
-// 若只掛在 board 上會攔不到而讓 app-root @click 清掉選取。window capture 是
-// 事件分派的最外層，無論 click 落在何處都能搶先攔下。
-function onGlobalClickCapture(event: MouseEvent): void {
-  if (_justMarqueed) {
-    event.stopPropagation()
-    _justMarqueed = false
-  }
-}
 
 // ── 假資料初始化（開發模式驗證用）──────────────────────────
 
@@ -462,115 +283,11 @@ function seedStoreWithStubData(): void {
   })
 }
 
-// ── 泳道垂直拖曳（自製）──────────────────────────────────────
-// 拖把手 → 來源泳道留空、浮起分身跟游標、插入提示線；放開改 laneOrder，由
-// TransitionGroup 平滑滑到新位。全程不動 entries/slotIndex/欄位對齊 → 區塊資料零變動。
-// 拖曳期間其餘泳道位置固定，故起始量一次幾何即可。
+// ── 泳道垂直拖曳（R5 抽離至 useLaneReorder）──────────────────
 const rotationBoardRef = ref<HTMLElement | null>(null)
+const { laneDrag, onLaneDragStart } = useLaneReorder(rotationBoardRef)
 
-interface LaneGeom { slotIndex: SlotIndex; top: number; height: number; mid: number }
-
-const laneDrag = reactive({
-  active: false,
-  slotIndex: null as SlotIndex | null,
-  cloneTop: 0, // 分身上緣（相對 board）
-  cloneWidth: 0,
-  cloneHeight: 0,
-  cloneColor: '#888888',
-  cloneName: '',
-  cloneElement: '',
-  lineTop: null as number | null, // 插入提示線 Y（相對 board）；null = 隱藏
-  targetIndex: 0, // 來源在「其餘泳道」中的最終插入位置
-})
-
-let _laneBoardTop = 0
-let _otherGeoms: LaneGeom[] = [] // 非來源泳道（顯示序），拖曳期間位置固定
-let _sourceDisplayIndex = 0
-let _pointerOffsetY = 0 // 抓取點到來源上緣的距離
-
-function _readLaneGeoms(): LaneGeom[] {
-  const boardEl = rotationBoardRef.value
-  if (!boardEl) return []
-  const boardRect = boardEl.getBoundingClientRect()
-  _laneBoardTop = boardRect.top
-  const out: LaneGeom[] = []
-  laneOrder.value.forEach((si) => {
-    const el = boardEl.querySelector<HTMLElement>(`.swimlane[data-slot-index="${si}"]`)
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const top = r.top - boardRect.top
-    out.push({ slotIndex: si, top, height: r.height, mid: top + r.height / 2 })
-  })
-  return out
-}
-
-function onLaneDragStart(payload: { slotIndex: SlotIndex; event: MouseEvent }): void {
-  const geoms = _readLaneGeoms()
-  const source = geoms.find((g) => g.slotIndex === payload.slotIndex)
-  if (!source) return
-  _sourceDisplayIndex = laneOrder.value.indexOf(payload.slotIndex)
-  _otherGeoms = geoms.filter((g) => g.slotIndex !== payload.slotIndex)
-  _pointerOffsetY = payload.event.clientY - (_laneBoardTop + source.top)
-
-  const char = characterStore.slots[payload.slotIndex].character
-  laneDrag.active = true
-  laneDrag.slotIndex = payload.slotIndex
-  laneDrag.cloneWidth = rotationBoardRef.value?.clientWidth ?? 0
-  laneDrag.cloneHeight = source.height
-  laneDrag.cloneColor = getElementColor(char?.element ?? null)
-  laneDrag.cloneName = char?.nameZh ?? `槽位 ${payload.slotIndex + 1}`
-  laneDrag.cloneElement = char?.element ?? ''
-  _updateLaneTarget(payload.event.clientY)
-
-  window.addEventListener('mousemove', onLaneDragMove)
-  window.addEventListener('mouseup', onLaneDragEnd)
-}
-
-function _updateLaneTarget(clientY: number): void {
-  const relY = clientY - _laneBoardTop
-  laneDrag.cloneTop = relY - _pointerOffsetY // 分身跟游標（扣抓取偏移）
-  // 來源在「其餘泳道」中的插入位置＝中點在游標之上的其餘泳道數
-  let idx = 0
-  for (const g of _otherGeoms) {
-    if (g.mid < relY) idx++
-    else break
-  }
-  laneDrag.targetIndex = idx
-  // 插入線 Y
-  if (_otherGeoms.length === 0) {
-    laneDrag.lineTop = null
-  } else if (idx <= 0) {
-    laneDrag.lineTop = _otherGeoms[0].top
-  } else if (idx >= _otherGeoms.length) {
-    const last = _otherGeoms[_otherGeoms.length - 1]
-    laneDrag.lineTop = last.top + last.height
-  } else {
-    laneDrag.lineTop = _otherGeoms[idx].top
-  }
-}
-
-function onLaneDragMove(event: MouseEvent): void {
-  if (!laneDrag.active) return
-  _updateLaneTarget(event.clientY)
-}
-
-function onLaneDragEnd(): void {
-  window.removeEventListener('mousemove', onLaneDragMove)
-  window.removeEventListener('mouseup', onLaneDragEnd)
-  if (laneDrag.active) {
-    // 來源在「其餘泳道」插到 targetIndex → 即最終顯示序索引
-    setOrderByMove(_sourceDisplayIndex, laneDrag.targetIndex)
-  }
-  laneDrag.active = false
-  laneDrag.slotIndex = null
-  laneDrag.lineTop = null
-}
-
-function handleResize(): void {
-  void remeasureAfterRender()
-}
-
-onMounted(async () => {
+onMounted(() => {
   if (import.meta.env.DEV) {
     const slots = characterStore.slots
     if (!slots[0].character) characterStore.setCharacter(0, 'jiyan')
@@ -580,29 +297,6 @@ onMounted(async () => {
     // 程式化初始填充不應成為可復原步驟（否則一次 Ctrl+Z 會清空整個主軸）。
     history.clear()
   }
-
-  await remeasureAfterRender()
-  if (document.fonts?.ready) {
-    document.fonts.ready.then(() => void remeasureAfterRender())
-  }
-  window.addEventListener('resize', handleResize)
-
-  // 框選起手：掛 window bubble（起點區由處理器內 closest 限定為主軸/標題列空白）。
-  // bubble 階段在 target 自身處理之後才跑，不搶 SortableJS 的區塊起拖。
-  window.addEventListener('mousedown', onScrollMouseDown)
-  // 框選後的 terminal click 攔截：window capture 確保放開點在 board 外也攔得到
-  window.addEventListener('click', onGlobalClickCapture, true)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  window.removeEventListener('mousedown', onScrollMouseDown)
-  window.removeEventListener('click', onGlobalClickCapture, true)
-  stopAutoScroll()
-  window.removeEventListener('mousemove', onMarqueeMove)
-  window.removeEventListener('mouseup', onMarqueeUp)
-  window.removeEventListener('mousemove', onLaneDragMove)
-  window.removeEventListener('mouseup', onLaneDragEnd)
 })
 </script>
 

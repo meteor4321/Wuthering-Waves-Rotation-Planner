@@ -1,38 +1,20 @@
 <script setup lang="ts">
 // DefaultBlockField.vue — 側邊欄「預設區塊」展示區。
 // 只負責「被拖出去」到主軸：清單本身不可排序、不接受拖入。
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { DEFAULT_BLOCKS } from '@/constants/defaultBlocks'
-import { useBlockDrag } from '@/composables/useBlockDrag'
+import { useSidebarDragList } from '@/composables/useSidebarDragList'
 import type { DefaultBlock } from '@/types/block'
-
-const { getOrCreatePendingInstanceId, onSidebarDragStart, getSidebarSortableOptions, handleDragEnd: _handleDragEnd } = useBlockDrag()
-
-function handleDragEnd(): void {
-  localBlocks.value = [...DEFAULT_BLOCKS]
-  _handleDragEnd()
-}
 
 // 套件要求綁定一個它能自行操作的陣列，不能直接綁常數。
 // 這份清單不會被排序也不接受拖入，所以不需要額外同步機制。
 const localBlocks = ref<DefaultBlock[]>([...DEFAULT_BLOCKS])
 
-const dragOptions = computed(() => getSidebarSortableOptions())
-
-// 拖去其他清單時，把原始區塊包成「看起來像主軸區塊」的暫時資料，
-// 避免畫面在正式寫入 store 前因為資料形狀不對而報錯。
-// id 改用 dragState.pendingInstanceId（拖曳開始時已預先產生），而非
-// 側邊欄原始 block 的固定 id：確保之後正式寫入 store 的資料與這個
-// 暫時物件共用同一個 id，:key 全程不變，也避免跟主軸上同款區塊撞號。
-function cloneToPlaceholder(original: DefaultBlock) {
-  return {
-    id: getOrCreatePendingInstanceId(),
-    slotIndex: 0,
-    block: { ...original },
-  }
-}
+// 拖曳樣板（dragOptions / clone 偽裝 / 結束還原）共用 useSidebarDragList（R3）
+const { dragOptions, cloneToPlaceholder, handleDragEnd, onSidebarDragStart } =
+  useSidebarDragList({ restore: () => { localBlocks.value = [...DEFAULT_BLOCKS] } })
 
 function handleDragStart(event: { oldIndex?: number }): void {
   const block = localBlocks.value[event.oldIndex ?? -1]

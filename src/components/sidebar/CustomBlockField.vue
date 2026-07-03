@@ -7,18 +7,12 @@ import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useCharacterStore } from '@/stores/useCharacterStore'
-import { useBlockDrag } from '@/composables/useBlockDrag'
+import { useSidebarDragList } from '@/composables/useSidebarDragList'
 import { getElementColor } from '@/constants/elements'
 import type { TemplateBlock } from '@/types/block'
 
 const sidebarStore = useSidebarStore()
 const characterStore = useCharacterStore()
-const {
-  getOrCreatePendingInstanceId,
-  onSidebarDragStart,
-  getSidebarSortableOptions,
-  handleDragEnd: _handleDragEnd,
-} = useBlockDrag()
 
 // 三個槽位各自的模板列表，未選角的槽位給空陣列
 const slotTemplates = computed(() =>
@@ -34,19 +28,11 @@ watch(slotTemplates, (next) => {
   localTemplatesPerSlot.value = next.map((t) => [...t])
 })
 
-const dragOptions = computed(() => getSidebarSortableOptions())
-
-// 拖去主軸時，先包成「看起來像主軸區塊」的暫時資料，避免畫面在
-// 正式寫入 store 前因為資料形狀不對而報錯。
-// id 改用 dragState.pendingInstanceId（拖曳開始時已預先產生），確保
-// 之後正式寫入 store 的資料與這個暫時物件共用同一個 id，:key 全程不變。
-function cloneToPlaceholder(original: TemplateBlock) {
-  return {
-    id: getOrCreatePendingInstanceId(),
-    slotIndex: 0,
-    block: { ...original },
-  }
-}
+// 拖曳樣板（dragOptions / clone 偽裝 / 結束還原）共用 useSidebarDragList（R3）
+const { dragOptions, cloneToPlaceholder, handleDragEnd, onSidebarDragStart } =
+  useSidebarDragList({
+    restore: () => { localTemplatesPerSlot.value = slotTemplates.value.map((t) => [...t]) },
+  })
 
 function handleDragStart(idx: number, event: { oldIndex?: number }): void {
   const template = localTemplatesPerSlot.value[idx]?.[event.oldIndex ?? -1]
@@ -61,14 +47,6 @@ function handleDragStart(idx: number, event: { oldIndex?: number }): void {
   } else {
     onSidebarDragStart(template)
   }
-}
-
-// 拖曳結束：務必重置全域拖曳狀態（否則 isDragging 殘留 → 鬆手後仍顯示落點預覽，
-// 且下一次操作的落地會被汙染。DefaultBlockField 早已綁 @end，此處先前漏綁＝d1 病灶）。
-// 同時還原本地緩衝（pull:'clone' 只是拖出複製，原模板列維持不變）。
-function handleDragEnd(): void {
-  localTemplatesPerSlot.value = slotTemplates.value.map((t) => [...t])
-  _handleDragEnd()
 }
 
 function handleDelete(templateId: string): void {

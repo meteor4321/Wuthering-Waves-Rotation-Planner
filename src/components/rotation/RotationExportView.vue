@@ -12,8 +12,10 @@ import { computed } from 'vue'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useLaneOrder } from '@/composables/useLaneOrder'
+import { useLaneLayout } from '@/composables/useLaneLayout'
 import { getElementColor } from '@/constants/elements'
-import type { RotationAxis, RotationEntry } from '@/types/rotation'
+import { TRACK_GAP_PX } from '@/constants/layout'
+import type { RotationAxis } from '@/types/rotation'
 import type { SlotIndex } from '@/types/character'
 
 const props = defineProps<{ axis: RotationAxis }>()
@@ -24,19 +26,8 @@ const { laneOrder } = useLaneOrder()
 // 全域欄數＝該軸 1D 陣列長度(每個 entry 佔一欄,跨泳道共用同一時間軸)。
 const columnCount = computed<number>(() => props.axis.entries.length)
 
-// id → 全域欄序(在 1D 陣列中的 index)。
-const idToColumn = computed<Map<string, number>>(() => {
-  const m = new Map<string, number>()
-  props.axis.entries.forEach((e, i) => m.set(e.id, i))
-  return m
-})
-
-// 依 slotIndex 把 entries 分到三條泳道(各自維持時間順序)。
-const entriesBySlot = computed<Record<SlotIndex, RotationEntry[]>>(() => {
-  const map: Record<SlotIndex, RotationEntry[]> = { 0: [], 1: [], 2: [] }
-  for (const e of props.axis.entries) map[e.slotIndex as SlotIndex].push(e)
-  return map
-})
+// 泳道分流與 id→全域欄序：與主面板共用 useLaneLayout（R2）。
+const { entriesBySlot, idToColumn } = useLaneLayout(() => props.axis.entries)
 
 // 泳道垂直顯示順序沿用全域 laneOrder,與主面板一致。
 const orderedSlots = computed<SlotIndex[]>(() => laneOrder.value)
@@ -55,7 +46,7 @@ function laneColor(slot: SlotIndex): string {
 
     <div
       class="export-view__lanes"
-      :style="{ '--col-count': columnCount }"
+      :style="{ '--col-count': columnCount, '--track-gap': `${TRACK_GAP_PX}px` }"
     >
       <div
         v-for="slot in orderedSlots"
@@ -110,11 +101,12 @@ function laneColor(slot: SlotIndex): string {
   color: rgba(34, 211, 238, 0.95);
 }
 
-/* 父格:欄 1 = header(max-content),其後 N 欄 = 時間欄(各自 max-content) */
+/* 父格:欄 1 = header(max-content),其後 N 欄 = 時間欄(各自 max-content)。
+   column-gap 用注入的 --track-gap（單一來源），與主面板泳道間距一致。 */
 .export-view__lanes {
   display: grid;
   grid-template-columns: max-content repeat(var(--col-count), max-content);
-  column-gap: 4px;
+  column-gap: var(--track-gap, 4px);
   row-gap: 8px;
 }
 

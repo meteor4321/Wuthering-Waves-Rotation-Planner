@@ -16,6 +16,7 @@ import { useBlockDrag, DROP_ZONE_ATTRIBUTE, type SortableEventLike } from '@/com
 import { useHistory } from '@/composables/useHistory'
 import { useDialog } from '@/composables/useDialog'
 import { getElementColor } from '@/constants/elements'
+import { TRACK_GAP_PX } from '@/constants/layout'
 import type { Character } from '@/types/character'
 import type { RotationEntry } from '@/types/rotation'
 
@@ -287,6 +288,7 @@ async function handleDeselectCharacter(): Promise<void> {
   <div
     class="swimlane"
     :class="[`swimlane--slot-${slotIndex}`, { 'swimlane--drag-source': draggingAsSource }]"
+    :style="{ '--track-gap': `${TRACK_GAP_PX}px` }"
     :[DROP_ZONE_ATTRIBUTE]="true"
     :data-slot-index="slotIndex"
     :aria-label="character ? `${character.nameZh} 的輸出軸` : `槽位 ${slotIndex + 1}（未選角）`"
@@ -439,7 +441,7 @@ async function handleDeselectCharacter(): Promise<void> {
   --header-width: 10rem;
   --lane-height: 4rem;
   --lane-color: rgba(255, 255, 255, 0.18);
-  --track-gap: 0.2rem;
+  /* --track-gap 由 template :style 注入（單一來源＝constants/layout.ts 的 TRACK_GAP_PX） */
   --track-px: 0.75rem;
 
   display: flex;
