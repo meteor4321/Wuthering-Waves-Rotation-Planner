@@ -9,6 +9,8 @@ lerna-debug.log*
 
 DesignDocument
 
+.claude
+
 node_modules
 dist
 dist-ssr
