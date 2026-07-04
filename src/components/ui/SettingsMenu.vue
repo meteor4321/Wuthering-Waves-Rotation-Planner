@@ -11,12 +11,27 @@
 // ============================================================
 
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useSettings } from '@/composables/state/useSettings'
+import {
+  useSettings,
+  clampSetting,
+  HISTORY_LIMIT_BOUNDS,
+  TRACK_GAP_BOUNDS,
+} from '@/composables/state/useSettings'
 import { useDialog } from '@/composables/state/useDialog'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { showToast } from '@/composables/state/useToast'
 
 const { settings } = useSettings()
+
+// 數值設定：輸入後夾回範圍再寫入（防手打超界值）。
+function onHistoryInput(e: Event): void {
+  const v = Number((e.target as HTMLInputElement).value)
+  settings.value.historyLimit = clampSetting(v, HISTORY_LIMIT_BOUNDS, settings.value.historyLimit)
+}
+function onTrackGapInput(e: Event): void {
+  const v = Number((e.target as HTMLInputElement).value)
+  settings.value.trackGapPx = clampSetting(v, TRACK_GAP_BOUNDS, settings.value.trackGapPx)
+}
 const dialog = useDialog()
 const sidebarStore = useSidebarStore()
 
@@ -140,6 +155,70 @@ async function handleClearData(): Promise<void> {
             class="settings-menu__switch"
             role="switch"
             :aria-checked="settings.autoUppercase"
+          />
+        </label>
+
+        <!-- 動畫效果 -->
+        <label class="settings-menu__row settings-menu__row--clickable">
+          <span class="settings-menu__label">
+            動畫效果
+            <span class="settings-menu__hint">關閉可減少動態、提升效能</span>
+          </span>
+          <input
+            v-model="settings.animationsEnabled"
+            type="checkbox"
+            class="settings-menu__switch"
+            role="switch"
+            :aria-checked="settings.animationsEnabled"
+          />
+        </label>
+
+        <div class="settings-menu__divider" aria-hidden="true" />
+
+        <!-- 復原步數 -->
+        <label class="settings-menu__row">
+          <span class="settings-menu__label">
+            復原步數上限
+            <span class="settings-menu__hint">{{ HISTORY_LIMIT_BOUNDS.min }}–{{ HISTORY_LIMIT_BOUNDS.max }} 步</span>
+          </span>
+          <input
+            class="settings-menu__number"
+            type="number"
+            :min="HISTORY_LIMIT_BOUNDS.min"
+            :max="HISTORY_LIMIT_BOUNDS.max"
+            :value="settings.historyLimit"
+            @change="onHistoryInput"
+          />
+        </label>
+
+        <!-- 區塊間距 -->
+        <label class="settings-menu__row">
+          <span class="settings-menu__label">
+            區塊間距
+            <span class="settings-menu__hint">{{ TRACK_GAP_BOUNDS.min }}–{{ TRACK_GAP_BOUNDS.max }} px</span>
+          </span>
+          <input
+            class="settings-menu__number"
+            type="number"
+            :min="TRACK_GAP_BOUNDS.min"
+            :max="TRACK_GAP_BOUNDS.max"
+            :value="settings.trackGapPx"
+            @change="onTrackGapInput"
+          />
+        </label>
+
+        <!-- 記住匯出設定 -->
+        <label class="settings-menu__row settings-menu__row--clickable">
+          <span class="settings-menu__label">
+            記住匯出設定
+            <span class="settings-menu__hint">保留上次的檔名與合併方式</span>
+          </span>
+          <input
+            v-model="settings.rememberExport"
+            type="checkbox"
+            class="settings-menu__switch"
+            role="switch"
+            :aria-checked="settings.rememberExport"
           />
         </label>
 
@@ -272,6 +351,23 @@ async function handleClearData(): Promise<void> {
   cursor: pointer;
 }
 .settings-menu__select:focus-visible {
+  outline: 1px solid rgba(34, 211, 238, 0.6);
+  outline-offset: 1px;
+}
+
+.settings-menu__number {
+  flex-shrink: 0;
+  width: 4rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background-color: #0d1320;
+  color: rgba(240, 244, 248, 0.9);
+  font-family: inherit;
+  font-size: 0.75rem;
+  text-align: right;
+}
+.settings-menu__number:focus-visible {
   outline: 1px solid rgba(34, 211, 238, 0.6);
   outline-offset: 1px;
 }
