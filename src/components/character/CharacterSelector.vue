@@ -72,13 +72,32 @@ function updateDropdownPosition(): void {
   const el = triggerRef.value
   if (!el) return
   const r = el.getBoundingClientRect()
-  dropdownStyle.value = {
+  const GAP = 6 // trigger 與選單間距
+  const MARGIN = 8 // 選單與視窗邊緣留白
+  const DESIRED = 320 // 選單理想高度（與 CSS max-height 一致）
+
+  // 依可用空間決定向下或向上展開，並夾住高度使其永不超出視窗
+  // （第三泳道在矮視窗如 VS Code 內嵌瀏覽器向下會被裁切 → 改向上或縮高）。
+  const spaceBelow = window.innerHeight - r.bottom - GAP - MARGIN
+  const spaceAbove = r.top - GAP - MARGIN
+  const openUp = spaceBelow < DESIRED && spaceAbove > spaceBelow
+  const maxH = Math.max(140, Math.min(DESIRED, openUp ? spaceAbove : spaceBelow))
+
+  const base: Record<string, string> = {
     position: 'fixed',
-    top: `${r.bottom + 6}px`,
     left: `${r.left}px`,
     // a3：至少與 trigger 同寬，但給較大下限讓較長角色名不被截斷
     minWidth: `${Math.max(r.width, 180)}px`,
+    maxHeight: `${maxH}px`, // 內聯覆蓋 CSS 固定 320，確保不超出視窗
   }
+  if (openUp) {
+    base.bottom = `${window.innerHeight - r.top + GAP}px`
+    base.transformOrigin = 'bottom'
+  } else {
+    base.top = `${r.bottom + GAP}px`
+    base.transformOrigin = 'top'
+  }
+  dropdownStyle.value = base
 }
 
 // a5：依鳴潮角色屬性（element）分組。每個選項保留其在 props.options 的扁平索引，

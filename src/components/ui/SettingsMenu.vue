@@ -292,12 +292,26 @@ async function handleClearData(): Promise<void> {
   position: fixed;
   z-index: 200;
   width: 15.5rem;
+  /* 內容過長（如英文較高）時不超出視窗：夾住高度並內部捲動。
+     top 由 JS 注入（約 header 底 56px），故上下各留約 1rem 邊距。 */
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.625rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   background-color: #111827;
   box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.7);
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.25) transparent;
+}
+.settings-menu__panel::-webkit-scrollbar {
+  width: 6px;
+}
+.settings-menu__panel::-webkit-scrollbar-thumb {
+  background-color: rgba(34, 211, 238, 0.25);
+  border-radius: 3px;
 }
 
 .settings-menu__heading {

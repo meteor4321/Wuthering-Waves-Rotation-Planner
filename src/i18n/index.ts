@@ -31,7 +31,7 @@ export const i18n = createI18n({
   legacy: false, // Composition API 模式
   globalInjection: true, // 模板可直接用 $t()
   locale: settings.value.language,
-  fallbackLocale: 'zh-TW', // 缺字回母語，不出現空白/key 原文
+  fallbackLocale: 'en', // 缺字回英文（不出現空白/key 原文；en 為預設主語言）
   messages: { 'zh-TW': zhTW, en },
   // 缺字 fallback 是預期行為（en 可分批補），不刷 console 警告。
   missingWarn: false,
