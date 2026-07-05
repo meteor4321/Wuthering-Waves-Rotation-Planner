@@ -14,8 +14,11 @@ import { onBeforeUnmount, type Ref } from 'vue';
 const EDGE_TOL = 4        // 右側視為「超出範圍」的容差（px）
 const LEFT_RAMP_PX = 140  // 左側：游標越過 header 右緣多遠時加速到頂（px）＝緩衝帶寬度
 const MIN_STEP = 4        // 剛進入觸發區的起始速度（px/幀）
-const MAX_STEP = 20       // 加速到頂的速度（px/幀）
-const ACCEL_MS = 1000     // 右側：從 MIN_STEP 漸進加速到 MAX_STEP 所需的停留時間(ms)
+const MAX_STEP = 20       // 左側加速到頂的速度（px/幀）
+const ACCEL_MS = 1000     // 右側：從 MIN_STEP 漸進加速到 RIGHT_MAX_STEP 所需的停留時間(ms)
+// 右側專用：放慢頂速並拉長加速曲線（右緣是物理牆，體感過快 → 獨立調參）。
+const RIGHT_MAX_STEP = 11 // 右側加速到頂的速度（px/幀，較左側 20 慢）
+const RIGHT_ACCEL_MS = 1800 // 右側從 MIN_STEP 加速到頂所需停留時間(ms，較 1000 更緩）
 
 export function useEdgeAutoScroll(
   scrollElRef: Ref<HTMLElement | null>,
@@ -52,8 +55,8 @@ export function useEdgeAutoScroll(
         dir = 1;
         const now = performance.now();
         if (_accelStart === 0) _accelStart = now; // 剛進入右側觸發區 → 從慢速重新起步
-        const t = Math.min(1, (now - _accelStart) / ACCEL_MS);
-        step = MIN_STEP + (MAX_STEP - MIN_STEP) * t * t;
+        const t = Math.min(1, (now - _accelStart) / RIGHT_ACCEL_MS);
+        step = MIN_STEP + (RIGHT_MAX_STEP - MIN_STEP) * t * t;
       } else {
         _accelStart = 0; // 離開觸發區 → 重置右側加速，下次重新從慢速起步
       }

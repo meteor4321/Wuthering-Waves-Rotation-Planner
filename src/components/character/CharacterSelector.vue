@@ -385,7 +385,11 @@ onUnmounted(() => {
               @mouseenter="highlightedIndex = index"
               @click="selectOption(char)"
             >
-              <span class="char-selector__avatar" aria-hidden="true">
+              <span
+                class="char-selector__avatar"
+                :style="{ '--rarity-color': char.rarity === 5 ? '#FFB400' : '#9B66F0' }"
+                aria-hidden="true"
+              >
                 <img
                   v-if="char.avatar"
                   class="char-selector__avatar-img"
@@ -604,7 +608,8 @@ onUnmounted(() => {
   height: 2.75rem;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  /* 依星級細框：5★ 金 #FFB400 / 4★ 紫 #9B66F0（色值由 --rarity-color 內聯注入）。 */
+  border: 1px solid var(--rarity-color, rgba(255, 255, 255, 0.10));
   overflow: hidden;
 }
 
