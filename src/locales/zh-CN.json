@@ -1,0 +1,121 @@
+{
+  "header": {
+    "title": "鸣潮排轴编辑器",
+    "export": "导出",
+    "exportTooltip": "导出输出轴图片"
+  },
+  "sidebar": {
+    "panelLabel": "区块侧边栏",
+    "switchTabsLabel": "切换区块类型",
+    "presetTab": "预设",
+    "customTab": "自定义",
+    "generalBlocks": "基础招式",
+    "collapse": "收起侧边栏",
+    "expand": "展开侧边栏",
+    "characterFallback": "角色 {n}",
+    "templateCount": "共 {n} 个模板",
+    "noCharacter": "尚未选角",
+    "noCharacterLabel": "尚未选角，无法显示自定义模板",
+    "noTemplatesLabel": "该角色尚无自定义模板",
+    "emptyHint": "从主轴拖回区块以添加模板",
+    "templatesOf": "{name} 的自定义模板",
+    "deleteTemplate": "删除模板 {label}",
+    "addGeneralBlock": "新增通用区块",
+    "deleteGeneralBlock": "删除区块 {label}"
+  },
+  "swimlane": {
+    "selectCharacter": "选择角色",
+    "changeCharacter": "更换角色：{name}",
+    "laneOf": "{name} 的输出轴",
+    "laneEmpty": "槽位 {n}（未选角）",
+    "dragLane": "拖拽调整泳道顺序",
+    "blockSeqOf": "{name} 的区块序列",
+    "blockSeq": "区块序列",
+    "pickFirstHint": "请先选择角色",
+    "pickFirstLabel": "请先在上方选择角色",
+    "dropHere": "拖放至此",
+    "addBlockLabel": "在 {name} 的输出轴添加区块",
+    "addBlockTitle": "添加区块至 {name}",
+    "deselect": "取消选角",
+    "switchTitle": "切换角色",
+    "switchMessage": "将清空该角色的所有区块，确定？",
+    "switchConfirm": "切换",
+    "deselectMessage": "将清空该角色的所有区块，确定？",
+    "noCharacterExport": "未选角"
+  },
+  "selector": {
+    "elementTab": "属性 {element}"
+  },
+  "board": {
+    "panelLabel": "输出轴面板"
+  },
+  "axis": {
+    "defaultName": "输出轴 {n}",
+    "tabsLabel": "输出轴标签",
+    "addTitle": "新增输出轴",
+    "namePlaceholder": "输出轴名称",
+    "create": "创建",
+    "deleteTitle": "删除输出轴",
+    "deleteMessage": "确定删除“{name}”？",
+    "delete": "删除"
+  },
+  "export": {
+    "dialogLabel": "导出设置",
+    "title": "导出输出轴图片",
+    "filename": "文件名",
+    "filenamePlaceholder": "输入文件名",
+    "format": "文件格式",
+    "formatPng": "PNG（位图）",
+    "formatSvg": "SVG（矢量图，文件较小）",
+    "resolution": "分辨率倍率",
+    "resolutionHint": "倍率越高越清晰、文件越大；PNG 过大时可调低。",
+    "axes": "要导出的输出轴",
+    "multiMode": "多轴导出方式",
+    "merge": "合并成一张图",
+    "zip": "分别打包成 ZIP",
+    "action": "导出",
+    "nodeNotFound": "找不到导出视图节点"
+  },
+  "settings": {
+    "gearLabel": "设置",
+    "heading": "设置",
+    "language": "界面语言",
+    "capsLock": "大写锁定",
+    "capsLockHint": "区块文本提交时自动转大写",
+    "animations": "动画效果",
+    "animationsHint": "关闭可减少动态、提升性能",
+    "historyLimit": "撤销步数上限",
+    "historyLimitHint": "{min}–{max} 步",
+    "trackGap": "区块间距",
+    "trackGapHint": "{min}–{max} px",
+    "rememberExport": "记住导出设置",
+    "rememberExportHint": "保留上次的文件名与合并方式",
+    "clearData": "清除数据",
+    "clearDataHint": "删除全部自定义模板（无法撤销）",
+    "clearBtn": "清除自定义模板",
+    "clearConfirmTitle": "清除数据",
+    "clearConfirmMessage": "将删除全部 {n} 个自定义模板（无法撤销）。确定要清除吗？",
+    "clearConfirmEmpty": "自定义模板库目前为空，仍要执行清除吗？",
+    "clearConfirm": "清除"
+  },
+  "dialog": {
+    "ok": "确定",
+    "cancel": "取消"
+  },
+  "toast": {
+    "exportedPng": "已导出图片",
+    "exportedSvg": "已导出 SVG",
+    "exportedZip": "已导出 ZIP",
+    "exportFailed": "导出失败：{msg}",
+    "copied": "已复制",
+    "copiedN": "已复制 {n} 个区块",
+    "templateExists": "模板库已有相同区块",
+    "templatesAllExist": "所选区块均已存在于模板库",
+    "templateAdded": "已添加至模板库",
+    "templatesAdded": "已添加 {n} 个区块至模板库",
+    "templatesAddedSkipped": "已添加 {added} 个区块至模板库，{skipped} 个区块已存在",
+    "templatesCleared": "已清除 {n} 个自定义模板",
+    "templatesClearedEmpty": "已清除（模板库原本为空）",
+    "closeLabel": "关闭提示"
+  }
+}

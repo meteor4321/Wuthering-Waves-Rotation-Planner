@@ -7,22 +7,34 @@
 //      經 characterDisplayName / elementDisplayName 依 locale 切換。
 //
 // 語言狀態單一來源＝useSettings.language（持久化）；此處 watch 同步到
-// i18n.global.locale（響應式 → 切換即時生效免重整）。缺字 fallback 回 zh-TW。
+// i18n.global.locale（響應式 → 切換即時生效免重整）。缺字 fallback 回 en。
+//
+// 介面字串支援 5 語言：簡中/繁中/英/日/韓。資料名稱（角色/屬性）目前僅備繁中與英文，
+// 日/韓與簡中的資料名於 Part 2（爬蟲補多語欄位）前，暫以英文/繁中優雅回退。
 // ============================================================
 
 import { createI18n } from 'vue-i18n';
 import { watch } from 'vue';
 import { useSettings } from '@/composables/state/useSettings';
+import zhCN from '@/locales/zh-CN.json';
 import zhTW from '@/locales/zh-TW.json';
 import en from '@/locales/en.json';
+import ja from '@/locales/ja.json';
+import ko from '@/locales/ko.json';
 import elementsGenerated from '@/data/elements.generated.json';
 import elementsOverrides from '@/data/elements.overrides.json';
 import type { Character, CharacterElement } from '@/types/character';
 
+/** 支援的介面語言代碼。 */
+export type LocaleCode = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko';
+
 /** 支援的介面語言（設定選單選項與 locale 檔一一對應）。 */
 export const SUPPORTED_LOCALES = [
+  { value: 'zh-CN', label: '简体中文' },
   { value: 'zh-TW', label: '繁體中文' },
   { value: 'en', label: 'English' },
+  { value: 'ja', label: '日本語' },
+  { value: 'ko', label: '한국어' },
 ] as const;
 
 const { settings } = useSettings();
@@ -31,9 +43,9 @@ export const i18n = createI18n({
   legacy: false, // Composition API 模式
   globalInjection: true, // 模板可直接用 $t()
   locale: settings.value.language,
-  fallbackLocale: 'en', // 缺字回英文（不出現空白/key 原文；en 為預設主語言）
-  messages: { 'zh-TW': zhTW, en },
-  // 缺字 fallback 是預期行為（en 可分批補），不刷 console 警告。
+  fallbackLocale: 'en', // 缺字回英文（不出現空白/key 原文；en 為主要基準語言）
+  messages: { 'zh-CN': zhCN, 'zh-TW': zhTW, en, ja, ko },
+  // 缺字 fallback 是預期行為（新語言可分批補），不刷 console 警告。
   missingWarn: false,
   fallbackWarn: false,
 });
@@ -42,7 +54,7 @@ export const i18n = createI18n({
 watch(
   () => settings.value.language,
   (lang) => {
-    i18n.global.locale.value = lang as 'zh-TW' | 'en';
+    i18n.global.locale.value = lang as LocaleCode;
   },
 );
 

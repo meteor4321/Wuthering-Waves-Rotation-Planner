@@ -1,0 +1,121 @@
+{
+  "header": {
+    "title": "鳴潮 ローテーションエディター",
+    "export": "エクスポート",
+    "exportTooltip": "ローテーション画像をエクスポート"
+  },
+  "sidebar": {
+    "panelLabel": "ブロックサイドバー",
+    "switchTabsLabel": "ブロックタイプを切り替え",
+    "presetTab": "プリセット",
+    "customTab": "カスタム",
+    "generalBlocks": "基本アクション",
+    "collapse": "サイドバーを折りたたむ",
+    "expand": "サイドバーを展開",
+    "characterFallback": "キャラクター {n}",
+    "templateCount": "テンプレート {n} 件",
+    "noCharacter": "キャラクター未選択",
+    "noCharacterLabel": "キャラクター未選択のためカスタムテンプレートは利用できません",
+    "noTemplatesLabel": "このキャラクターにはまだカスタムテンプレートがありません",
+    "emptyHint": "タイムラインからブロックをドラッグして戻すとテンプレートを保存できます",
+    "templatesOf": "{name} のカスタムテンプレート",
+    "deleteTemplate": "テンプレート {label} を削除",
+    "addGeneralBlock": "汎用ブロックを追加",
+    "deleteGeneralBlock": "ブロック {label} を削除"
+  },
+  "swimlane": {
+    "selectCharacter": "キャラクターを選択",
+    "changeCharacter": "キャラクターを変更：{name}",
+    "laneOf": "{name} のローテーション",
+    "laneEmpty": "スロット {n}（空き）",
+    "dragLane": "ドラッグしてレーンを並べ替え",
+    "blockSeqOf": "{name} のブロック列",
+    "blockSeq": "ブロック列",
+    "pickFirstHint": "先にキャラクターを選択してください",
+    "pickFirstLabel": "先に上でキャラクターを選択してください",
+    "dropHere": "ここにドロップ",
+    "addBlockLabel": "{name} のレーンにブロックを追加",
+    "addBlockTitle": "{name} にブロックを追加",
+    "deselect": "キャラクター選択を解除",
+    "switchTitle": "キャラクター切り替え",
+    "switchMessage": "このキャラクターのブロックがすべて消去されます。続行しますか？",
+    "switchConfirm": "切り替え",
+    "deselectMessage": "このキャラクターのブロックがすべて消去されます。続行しますか？",
+    "noCharacterExport": "キャラクターなし"
+  },
+  "selector": {
+    "elementTab": "属性 {element}"
+  },
+  "board": {
+    "panelLabel": "ローテーションボード"
+  },
+  "axis": {
+    "defaultName": "ローテーション {n}",
+    "tabsLabel": "ローテーションタブ",
+    "addTitle": "新規ローテーション",
+    "namePlaceholder": "ローテーション名",
+    "create": "作成",
+    "deleteTitle": "ローテーションを削除",
+    "deleteMessage": "「{name}」を削除しますか？",
+    "delete": "削除"
+  },
+  "export": {
+    "dialogLabel": "エクスポート設定",
+    "title": "ローテーション画像をエクスポート",
+    "filename": "ファイル名",
+    "filenamePlaceholder": "ファイル名を入力",
+    "format": "ファイル形式",
+    "formatPng": "PNG（ラスター）",
+    "formatSvg": "SVG（ベクター、ファイル小）",
+    "resolution": "解像度倍率",
+    "resolutionHint": "倍率が高いほど鮮明ですがファイルは大きくなります。PNG が大きすぎる場合は下げてください。",
+    "axes": "エクスポートするローテーション",
+    "multiMode": "複数ローテーションの出力方法",
+    "merge": "1枚の画像に結合",
+    "zip": "個別ファイルをZIPにまとめる",
+    "action": "エクスポート",
+    "nodeNotFound": "エクスポートビューのノードが見つかりません"
+  },
+  "settings": {
+    "gearLabel": "設定",
+    "heading": "設定",
+    "language": "表示言語",
+    "capsLock": "大文字ロック",
+    "capsLockHint": "ブロックのテキストを確定時に自動で大文字化",
+    "animations": "アニメーション",
+    "animationsHint": "オフにすると動きを減らして性能を向上",
+    "historyLimit": "元に戻す回数の上限",
+    "historyLimitHint": "{min}–{max} 回",
+    "trackGap": "ブロック間隔",
+    "trackGapHint": "{min}–{max} px",
+    "rememberExport": "エクスポート設定を記憶",
+    "rememberExportHint": "前回のファイル名と結合方法を保持",
+    "clearData": "データを消去",
+    "clearDataHint": "すべてのカスタムテンプレートを削除（元に戻せません）",
+    "clearBtn": "カスタムテンプレートを消去",
+    "clearConfirmTitle": "データを消去",
+    "clearConfirmMessage": "{n} 件のカスタムテンプレートをすべて削除します（元に戻せません）。続行しますか？",
+    "clearConfirmEmpty": "テンプレートライブラリは既に空です。それでも消去しますか？",
+    "clearConfirm": "消去"
+  },
+  "dialog": {
+    "ok": "OK",
+    "cancel": "キャンセル"
+  },
+  "toast": {
+    "exportedPng": "画像をエクスポートしました",
+    "exportedSvg": "SVGをエクスポートしました",
+    "exportedZip": "ZIPをエクスポートしました",
+    "exportFailed": "エクスポート失敗：{msg}",
+    "copied": "コピーしました",
+    "copiedN": "{n} 個のブロックをコピーしました",
+    "templateExists": "同じブロックが既にライブラリにあります",
+    "templatesAllExist": "選択したブロックはすべてライブラリに存在します",
+    "templateAdded": "テンプレートライブラリに追加しました",
+    "templatesAdded": "{n} 個のブロックをライブラリに追加しました",
+    "templatesAddedSkipped": "{added} 個のブロックを追加、{skipped} 個は既に存在",
+    "templatesCleared": "{n} 個のカスタムテンプレートを消去しました",
+    "templatesClearedEmpty": "消去しました（ライブラリは元々空でした）",
+    "closeLabel": "通知を閉じる"
+  }
+}
