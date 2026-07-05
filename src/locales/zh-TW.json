@@ -9,7 +9,7 @@
     "switchTabsLabel": "切換區塊類型",
     "presetTab": "預設",
     "customTab": "自訂",
-    "defaultBlocks": "基礎招式",
+    "generalBlocks": "基礎招式",
     "collapse": "收合側邊欄",
     "expand": "展開側邊欄",
     "characterFallback": "角色 {n}",
@@ -19,7 +19,9 @@
     "noTemplatesLabel": "此角色尚無自訂模板",
     "emptyHint": "從主軸拖回區塊以新增模板",
     "templatesOf": "{name} 的自訂模板",
-    "deleteTemplate": "刪除模板 {label}"
+    "deleteTemplate": "刪除模板 {label}",
+    "addGeneralBlock": "新增通用區塊",
+    "deleteGeneralBlock": "刪除區塊 {label}"
   },
   "swimlane": {
     "selectCharacter": "選擇角色",

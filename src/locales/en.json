@@ -9,7 +9,7 @@
     "switchTabsLabel": "Switch block type",
     "presetTab": "Preset",
     "customTab": "Custom",
-    "defaultBlocks": "Basic Moves",
+    "generalBlocks": "Basic Moves",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "characterFallback": "Character {n}",
@@ -19,7 +19,9 @@
     "noTemplatesLabel": "This character has no custom templates yet",
     "emptyHint": "Drag blocks back from the timeline to save templates",
     "templatesOf": "Custom templates of {name}",
-    "deleteTemplate": "Delete template {label}"
+    "deleteTemplate": "Delete template {label}",
+    "addGeneralBlock": "Add general block",
+    "deleteGeneralBlock": "Delete block {label}"
   },
   "swimlane": {
     "selectCharacter": "Select character",
