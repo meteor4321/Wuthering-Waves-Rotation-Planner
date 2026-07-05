@@ -53,7 +53,7 @@ export const DEFAULT_BLOCKS: DefaultBlock[] = [
   },
   {
     id: 'default-D',
-    label: '閃',
+    label: 'D',
     color: '#64748B',
     characterId: null,
     source: 'default',
@@ -61,7 +61,7 @@ export const DEFAULT_BLOCKS: DefaultBlock[] = [
   },
   {
     id: 'default-SWAP',
-    label: '變奏',
+    label: 'QTE',
     color: '#64748B',
     characterId: null,
     source: 'default',
