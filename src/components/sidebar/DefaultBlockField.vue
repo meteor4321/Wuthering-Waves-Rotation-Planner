@@ -36,13 +36,20 @@ function handleDragStart(event: { oldIndex?: number }): void {
         @start="handleDragStart"
         @end="handleDragEnd"
       >
-        <BlockChip
+        <!-- 每個 chip 外包 .chip-wrapper（與 CustomBlockField 一致）：拖曳浮動分身
+             克隆到「無 transform 的外層」，放大縮放(scale 1.05)才會套在整個 .block-chip
+             盒上，克隆的縮放效果與主軸/自訂區塊一致（否則 scale 只套到 chip 內層）。 -->
+        <div
           v-for="block in localBlocks"
           :key="block.id"
-          :label="block.label"
-          :color="block.color"
-          compact
-        />
+          class="chip-wrapper"
+        >
+          <BlockChip
+            :label="block.label"
+            :color="block.color"
+            compact
+          />
+        </div>
       </VueDraggable>
     </div>
   </section>
@@ -79,5 +86,10 @@ function handleDragStart(event: { oldIndex?: number }): void {
   flex-wrap: wrap;
   gap: 0.375rem;
   width: 100%;
+}
+/* chip 外層包裝：僅提供無 transform 的盒模型（拖曳分身放大套在內層 chip 盒上）。 */
+.chip-wrapper {
+  position: relative;
+  display: inline-flex;
 }
 </style>
