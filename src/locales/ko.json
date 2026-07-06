@@ -1,0 +1,121 @@
+{
+  "header": {
+    "title": "명조 로테이션 편집기",
+    "export": "내보내기",
+    "exportTooltip": "로테이션 이미지 내보내기"
+  },
+  "sidebar": {
+    "panelLabel": "블록 사이드바",
+    "switchTabsLabel": "블록 유형 전환",
+    "presetTab": "프리셋",
+    "customTab": "사용자 지정",
+    "generalBlocks": "기본 동작",
+    "collapse": "사이드바 접기",
+    "expand": "사이드바 펼치기",
+    "characterFallback": "캐릭터 {n}",
+    "templateCount": "템플릿 {n}개",
+    "noCharacter": "캐릭터 미선택",
+    "noCharacterLabel": "캐릭터를 선택하지 않아 사용자 템플릿을 사용할 수 없습니다",
+    "noTemplatesLabel": "이 캐릭터에는 아직 사용자 템플릿이 없습니다",
+    "emptyHint": "타임라인에서 블록을 다시 끌어와 템플릿을 저장하세요",
+    "templatesOf": "{name}의 사용자 템플릿",
+    "deleteTemplate": "템플릿 {label} 삭제",
+    "addGeneralBlock": "일반 블록 추가",
+    "deleteGeneralBlock": "블록 {label} 삭제"
+  },
+  "swimlane": {
+    "selectCharacter": "캐릭터 선택",
+    "changeCharacter": "캐릭터 변경: {name}",
+    "laneOf": "{name}의 로테이션",
+    "laneEmpty": "슬롯 {n}(비어 있음)",
+    "dragLane": "드래그하여 레인 순서 변경",
+    "blockSeqOf": "{name}의 블록 시퀀스",
+    "blockSeq": "블록 시퀀스",
+    "pickFirstHint": "먼저 캐릭터를 선택하세요",
+    "pickFirstLabel": "먼저 위에서 캐릭터를 선택하세요",
+    "dropHere": "여기에 놓기",
+    "addBlockLabel": "{name}의 레인에 블록 추가",
+    "addBlockTitle": "{name}에 블록 추가",
+    "deselect": "캐릭터 선택 해제",
+    "switchTitle": "캐릭터 전환",
+    "switchMessage": "이 캐릭터의 모든 블록이 삭제됩니다. 계속하시겠습니까?",
+    "switchConfirm": "전환",
+    "deselectMessage": "이 캐릭터의 모든 블록이 삭제됩니다. 계속하시겠습니까?",
+    "noCharacterExport": "캐릭터 없음"
+  },
+  "selector": {
+    "elementTab": "속성 {element}"
+  },
+  "board": {
+    "panelLabel": "로테이션 보드"
+  },
+  "axis": {
+    "defaultName": "로테이션 {n}",
+    "tabsLabel": "로테이션 탭",
+    "addTitle": "새 로테이션",
+    "namePlaceholder": "로테이션 이름",
+    "create": "생성",
+    "deleteTitle": "로테이션 삭제",
+    "deleteMessage": "\"{name}\"을(를) 삭제하시겠습니까?",
+    "delete": "삭제"
+  },
+  "export": {
+    "dialogLabel": "내보내기 설정",
+    "title": "로테이션 이미지 내보내기",
+    "filename": "파일 이름",
+    "filenamePlaceholder": "파일 이름 입력",
+    "format": "파일 형식",
+    "formatPng": "PNG(래스터)",
+    "formatSvg": "SVG(벡터, 파일 작음)",
+    "resolution": "해상도 배율",
+    "resolutionHint": "배율이 높을수록 선명하지만 파일이 커집니다. PNG가 너무 크면 낮추세요.",
+    "axes": "내보낼 로테이션",
+    "multiMode": "다중 로테이션 출력 방식",
+    "merge": "한 장의 이미지로 병합",
+    "zip": "개별 파일을 ZIP으로 묶기",
+    "action": "내보내기",
+    "nodeNotFound": "내보내기 뷰 노드를 찾을 수 없습니다"
+  },
+  "settings": {
+    "gearLabel": "설정",
+    "heading": "설정",
+    "language": "표시 언어",
+    "capsLock": "대문자 잠금",
+    "capsLockHint": "블록 텍스트 확정 시 자동 대문자화",
+    "animations": "애니메이션",
+    "animationsHint": "끄면 동작을 줄이고 성능을 향상",
+    "historyLimit": "실행 취소 횟수 제한",
+    "historyLimitHint": "{min}–{max} 단계",
+    "trackGap": "블록 간격",
+    "trackGapHint": "{min}–{max} px",
+    "rememberExport": "내보내기 설정 기억",
+    "rememberExportHint": "마지막 파일 이름과 병합 방식 유지",
+    "clearData": "데이터 삭제",
+    "clearDataHint": "모든 사용자 템플릿 삭제(되돌릴 수 없음)",
+    "clearBtn": "사용자 템플릿 삭제",
+    "clearConfirmTitle": "데이터 삭제",
+    "clearConfirmMessage": "{n}개의 모든 사용자 템플릿을 삭제합니다(되돌릴 수 없음). 계속하시겠습니까?",
+    "clearConfirmEmpty": "템플릿 라이브러리가 이미 비어 있습니다. 그래도 삭제하시겠습니까?",
+    "clearConfirm": "삭제"
+  },
+  "dialog": {
+    "ok": "확인",
+    "cancel": "취소"
+  },
+  "toast": {
+    "exportedPng": "이미지를 내보냈습니다",
+    "exportedSvg": "SVG를 내보냈습니다",
+    "exportedZip": "ZIP을 내보냈습니다",
+    "exportFailed": "내보내기 실패: {msg}",
+    "copied": "복사했습니다",
+    "copiedN": "블록 {n}개를 복사했습니다",
+    "templateExists": "동일한 블록이 라이브러리에 이미 있습니다",
+    "templatesAllExist": "선택한 블록이 모두 라이브러리에 존재합니다",
+    "templateAdded": "템플릿 라이브러리에 추가했습니다",
+    "templatesAdded": "블록 {n}개를 라이브러리에 추가했습니다",
+    "templatesAddedSkipped": "블록 {added}개 추가, {skipped}개는 이미 존재",
+    "templatesCleared": "사용자 템플릿 {n}개를 삭제했습니다",
+    "templatesClearedEmpty": "삭제했습니다(라이브러리가 원래 비어 있었음)",
+    "closeLabel": "알림 닫기"
+  }
+}
