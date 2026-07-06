@@ -12,7 +12,9 @@
 <template>
   <header class="app-header">
     <div class="app-header__brand">
-      <span class="app-header__status-dot" aria-hidden="true" />
+      <span class="app-header__brand-icon" aria-hidden="true">
+        <img src="/Phoebe.svg" alt="" draggable="false" />
+      </span>
       <span class="app-header__divider" aria-hidden="true" />
 
       <div class="app-header__titles">
@@ -49,20 +51,25 @@
   min-width: 0;
 }
 
-/* 發光指示燈：呼吸燈效果，象徵系統運作中 */
-.app-header__status-dot {
+/* 品牌圖示：取代原呼吸燈，顯示指定圖片。
+   固定 36×36 顯示框 + overflow:hidden 作為裁切容器；
+   內層圖片以 transform: scale 放大，把圖檔本身四周的透明空白裁掉，
+   讓實際畫面填滿整個框。放大倍率與位移可視圖檔留白量微調。 */
+.app-header__brand-icon {
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #22D3EE;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.85);
-  animation: status-pulse 2.4s ease-in-out infinite;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 6px;
+  user-select: none;
 }
 
-@keyframes status-pulse {
-  0%, 100% { opacity: 1;    box-shadow: 0 0 8px rgba(34, 211, 238, 0.85); }
-  50%      { opacity: 0.55; box-shadow: 0 0 3px rgba(34, 211, 238, 0.40); }
+.app-header__brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* 放大以裁掉透明留白；1 = 不裁切，數字越大裁越多。 */
+  transform: scale(1.4);
 }
 
 /* 細線分隔：上下漸隱，避免死板的純色直線 */
@@ -127,10 +134,4 @@
   );
 }
 
-/* ── 無障礙：減少動畫模式 ──────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .app-header__status-dot {
-    animation: none;
-  }
-}
 </style>
