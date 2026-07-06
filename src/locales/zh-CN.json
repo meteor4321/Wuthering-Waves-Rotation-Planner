@@ -121,6 +121,28 @@
     "deleteTitle": "删除队伍",
     "deleteMessage": "确定删除“{name}”？"
   },
+  "help": {
+    "openTooltip": "使用说明与快捷键",
+    "title": "使用说明",
+    "closeLabel": "关闭",
+    "wheel": "滚轮",
+    "secNav": "浏览与选择",
+    "secEdit": "编辑",
+    "secHistory": "撤销",
+    "secView": "界面与滚动",
+    "navBlocks": "逐块向左／右选择区块",
+    "selectAll": "全选当前输出轴的所有区块",
+    "clearSelection": "清除所有选择",
+    "deleteBlocks": "删除选中的区块",
+    "copy": "复制选中的区块",
+    "cut": "剪切选中的区块",
+    "paste": "粘贴剪贴板内容",
+    "duplicateRight": "向右复制选中的区块",
+    "undo": "撤销",
+    "redo": "重做",
+    "toggleSidebar": "展开／收起侧边栏",
+    "horizontalScroll": "横向滚动输出轴"
+  },
   "dialog": {
     "ok": "确定",
     "cancel": "取消"

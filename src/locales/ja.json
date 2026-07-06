@@ -121,6 +121,28 @@
     "deleteTitle": "チームを削除",
     "deleteMessage": "「{name}」を削除しますか？"
   },
+  "help": {
+    "openTooltip": "使い方とショートカット",
+    "title": "使い方",
+    "closeLabel": "閉じる",
+    "wheel": "ホイール",
+    "secNav": "ナビゲーションと選択",
+    "secEdit": "編集",
+    "secHistory": "元に戻す",
+    "secView": "画面とスクロール",
+    "navBlocks": "ブロックを左／右へ順に選択",
+    "selectAll": "現在のローテーションの全ブロックを選択",
+    "clearSelection": "すべての選択を解除",
+    "deleteBlocks": "選択したブロックを削除",
+    "copy": "選択したブロックをコピー",
+    "cut": "選択したブロックを切り取り",
+    "paste": "クリップボードの内容を貼り付け",
+    "duplicateRight": "選択したブロックを右へ複製",
+    "undo": "元に戻す",
+    "redo": "やり直し",
+    "toggleSidebar": "サイドバーを開閉",
+    "horizontalScroll": "ローテーションを横スクロール"
+  },
   "dialog": {
     "ok": "OK",
     "cancel": "キャンセル"

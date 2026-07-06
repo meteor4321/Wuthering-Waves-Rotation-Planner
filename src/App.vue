@@ -6,6 +6,7 @@ import ToastNotification from '@/components/ui/ToastNotification.vue'
 import DialogHost from '@/components/ui/DialogHost.vue'
 import ExportDialog from '@/components/ui/ExportDialog.vue'
 import TeamManagerDialog from '@/components/ui/TeamManagerDialog.vue'
+import HelpDialog from '@/components/ui/HelpDialog.vue'
 import SettingsMenu from '@/components/ui/SettingsMenu.vue'
 import SidebarPanel from '@/components/sidebar/SidebarPanel.vue'
 import RotationBoard from '@/components/rotation/RotationBoard.vue'
@@ -14,6 +15,7 @@ import RotationExportView from '@/components/rotation/RotationExportView.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useExportDialog } from '@/composables/state/useExportDialog'
 import { useTeamManager } from '@/composables/state/useTeamManager'
+import { useHelpDialog } from '@/composables/state/useHelpDialog'
 import { nodeToPngBlob, nodeToSvgBlob, savePng, saveSvg, saveZip } from '@/composables/useImageExport'
 import type { ExportFormat } from '@/composables/state/useExportDialog'
 import { showToast } from '@/composables/state/useToast'
@@ -30,6 +32,7 @@ const templateStore = useTemplateStore()
 const generalBlockStore = useGeneralBlockStore()
 const exportDialog = useExportDialog()
 const teamManager = useTeamManager()
+const helpDialog = useHelpDialog()
 const { t } = useI18n()
 
 useKeyboardShortcuts()
@@ -138,6 +141,24 @@ function clearAllSelection(): void {
               @click.stop="handleExport"
             >{{ $t('header.export') }}</button>
             <SettingsMenu />
+            <button
+              type="button"
+              class="help-trigger"
+              :title="$t('help.openTooltip')"
+              :aria-label="$t('help.openTooltip')"
+              @click.stop="helpDialog.open()"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.4" />
+                <path
+                  d="M7.6 7.4a2.4 2.4 0 0 1 4.7.7c0 1.6-2.3 2-2.3 3.4"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                />
+                <circle cx="10" cy="14.6" r="0.9" fill="currentColor" />
+              </svg>
+            </button>
           </template>
         </AppHeader>
       </template>
@@ -159,6 +180,7 @@ function clearAllSelection(): void {
     <DialogHost />
     <ExportDialog />
     <TeamManagerDialog />
+    <HelpDialog />
 
     <!-- 離螢幕匯出舞台:平時不渲染任何軸,匯出時才暫時掛上要輸出的軸供截圖。
          合併多軸時,export-merge-wrap 內縱向堆疊多個視圖,整塊截一張。 -->
@@ -199,6 +221,36 @@ function clearAllSelection(): void {
   .export-trigger:focus-visible {
     outline: 1px solid rgba(34, 211, 238, 0.6);
     outline-offset: 1px;
+  }
+
+  /* 標題列說明按鈕：與齒輪同款中性方形圖示鈕（沿用 SettingsMenu 觸發鈕語彙） */
+  .help-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.04);
+    color: rgba(240, 244, 248, 0.65);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .help-trigger:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.35);
+    color: rgba(240, 244, 248, 0.95);
+  }
+  .help-trigger:focus-visible {
+    outline: none;
+    border-color: rgba(34, 211, 238, 0.6);
+    color: rgba(34, 211, 238, 0.95);
+  }
+  .help-trigger svg {
+    width: 1.125rem;
+    height: 1.125rem;
   }
 
   /* 離螢幕匯出舞台:移出可視範圍(不可用 display:none,否則量不到尺寸/截不到圖) */

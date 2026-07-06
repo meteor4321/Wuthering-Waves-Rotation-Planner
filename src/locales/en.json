@@ -121,6 +121,28 @@
     "deleteTitle": "Delete Team",
     "deleteMessage": "Delete \"{name}\"?"
   },
+  "help": {
+    "openTooltip": "Help & shortcuts",
+    "title": "Help",
+    "closeLabel": "Close",
+    "wheel": "Wheel",
+    "secNav": "Navigate & Select",
+    "secEdit": "Edit",
+    "secHistory": "History",
+    "secView": "Interface & Scroll",
+    "navBlocks": "Select blocks left/right one at a time",
+    "selectAll": "Select all blocks in the current rotation",
+    "clearSelection": "Clear all selection",
+    "deleteBlocks": "Delete selected blocks",
+    "copy": "Copy selected blocks",
+    "cut": "Cut selected blocks",
+    "paste": "Paste clipboard contents",
+    "duplicateRight": "Duplicate selected blocks to the right",
+    "undo": "Undo",
+    "redo": "Redo",
+    "toggleSidebar": "Expand/collapse sidebar",
+    "horizontalScroll": "Scroll the rotation horizontally"
+  },
   "dialog": {
     "ok": "OK",
     "cancel": "Cancel"
