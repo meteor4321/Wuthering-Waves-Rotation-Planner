@@ -16,13 +16,14 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useExportDialog } from '@/composables/state/useExportDialog'
 import { useTeamManager } from '@/composables/state/useTeamManager'
 import { useHelpDialog } from '@/composables/state/useHelpDialog'
+import { useSpotlightTour } from '@/composables/state/useSpotlightTour'
 import { nodeToPngBlob, nodeToSvgBlob, savePng, saveSvg, saveZip } from '@/composables/useImageExport'
 import type { ExportFormat } from '@/composables/state/useExportDialog'
 import { showToast } from '@/composables/state/useToast'
 import { useRotationStore } from '@/stores/useRotationStore'
 import { useTemplateStore } from '@/stores/useTemplateStore'
 import { useGeneralBlockStore } from '@/stores/useGeneralBlockStore'
-import { nextTick, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import JSZip from 'jszip'
 import type { RotationAxis } from '@/types/rotation'
@@ -33,7 +34,13 @@ const generalBlockStore = useGeneralBlockStore()
 const exportDialog = useExportDialog()
 const teamManager = useTeamManager()
 const helpDialog = useHelpDialog()
+const tour = useSpotlightTour()
 const { t } = useI18n()
+
+// 首訪自動播放功能導覽（僅第一次；之後由使用說明視窗的「重新觀看」重播）。
+onMounted(() => {
+  if (!tour.hasSeenTour.value) tour.start()
+})
 
 useKeyboardShortcuts()
 
@@ -131,12 +138,14 @@ function clearAllSelection(): void {
             <button
               type="button"
               class="export-trigger"
+              data-tour="teams"
               :title="$t('teams.openTooltip')"
               @click.stop="teamManager.open()"
             >{{ $t('teams.open') }}</button>
             <button
               type="button"
               class="export-trigger"
+              data-tour="export"
               :title="$t('header.exportTooltip')"
               @click.stop="handleExport"
             >{{ $t('header.export') }}</button>
@@ -144,6 +153,7 @@ function clearAllSelection(): void {
             <button
               type="button"
               class="help-trigger"
+              data-tour="help"
               :title="$t('help.openTooltip')"
               :aria-label="$t('help.openTooltip')"
               @click.stop="helpDialog.open()"
@@ -251,6 +261,169 @@ function clearAllSelection(): void {
   .help-trigger svg {
     width: 1.125rem;
     height: 1.125rem;
+  }
+
+  /* ── 功能導覽（driver.js）暗色主題：套 popoverClass='tour-popover' ── */
+  .driver-popover.tour-popover {
+    background-color: #131c2e;
+    border: 1px solid rgba(34, 211, 238, 0.65);
+    border-radius: 8px;
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.25),
+      0 0 24px -4px rgba(34, 211, 238, 0.35),
+      0 24px 70px -12px rgba(0, 0, 0, 0.9);
+    color: rgba(240, 244, 248, 0.92);
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    max-width: 20rem;
+  }
+  /* spotlight 高亮框：加青色光暈環，讓聚焦更明顯 */
+  .driver-active-element {
+    box-shadow:
+      0 0 0 2px rgba(34, 211, 238, 0.9),
+      0 0 22px 2px rgba(34, 211, 238, 0.55) !important;
+    border-radius: 8px;
+  }
+  .driver-popover.tour-popover .driver-popover-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: rgba(240, 244, 248, 0.98);
+  }
+  .driver-popover.tour-popover .driver-popover-description {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: rgba(240, 244, 248, 0.72);
+  }
+  .driver-popover.tour-popover .driver-popover-progress-text {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    color: rgba(34, 211, 238, 0.7);
+  }
+  /* 箭頭配合暗底上色（driver 以 border 畫三角，逐邊覆寫） */
+  .driver-popover.tour-popover .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: #0d1320; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: #0d1320; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: #0d1320; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #0d1320; }
+
+  .driver-popover.tour-popover .driver-popover-footer button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    color: rgba(240, 244, 248, 0.85);
+    text-shadow: none;
+    font-family: inherit;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .driver-popover.tour-popover .driver-popover-footer button:hover {
+    background-color: rgba(34, 211, 238, 0.16);
+    border-color: rgba(34, 211, 238, 0.55);
+    color: rgba(34, 211, 238, 0.95);
+  }
+  .driver-popover.tour-popover .driver-popover-close-btn {
+    color: rgba(240, 244, 248, 0.5);
+  }
+  .driver-popover.tour-popover .driver-popover-close-btn:hover {
+    color: rgba(240, 244, 248, 0.95);
+  }
+
+  /* ── 導覽示範動畫：虛擬滑鼠指標 / 點擊漣漪 / 框選框 ── */
+  /* 導覽期間：把被 Teleport 的真實 UI 抬到 driver 遮罩（z-index 1e9）之上，
+     否則下拉選單／確認框會被遮罩蓋住變暗、看不清。 */
+  body.tour-active .char-selector__listbox {
+    z-index: 1000000010 !important;
+  }
+  body.tour-active .dialog-overlay {
+    z-index: 1000000014 !important;
+  }
+  /* 真實拖曳期間：driver 的 disableActiveInteraction 會把高亮元件設為
+     pointer-events:none!important，導致 App 的 elementFromPoint 取不到泳道、
+     判為「禁止放置」。拖曳時暫時強制排軸板可命中（遮罩/氣泡則於 JS 關閉）。 */
+  body.tour-dragging .rotation-board,
+  body.tour-dragging .rotation-board *,
+  body.tour-dragging .sidebar-panel,
+  body.tour-dragging .sidebar-panel * {
+    pointer-events: auto !important;
+  }
+
+  .tour-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000000030;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-100px, -100px);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+    transition: opacity 0.2s ease;
+    will-change: transform;
+  }
+  .tour-cursor svg {
+    display: block;
+    transition: transform 0.12s ease;
+  }
+  .tour-cursor--press svg,
+  .tour-cursor--drag svg {
+    transform: scale(0.82);
+  }
+  .tour-ripple {
+    position: fixed;
+    z-index: 1000000028;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: rgba(34, 211, 238, 0.5);
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.8);
+    animation: tour-ripple 0.6s ease-out forwards;
+  }
+  @keyframes tour-ripple {
+    0% { transform: scale(0.3); opacity: 0.9; }
+    100% { transform: scale(3.2); opacity: 0; }
+  }
+  /* 拖曳分身：模仿被拖 chip 的浮起外觀，跟隨虛擬指標 */
+  .tour-ghost {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100000;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    background: var(--ghost-bg, #22d3ee);
+    color: #0a0f1e;
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.25);
+    opacity: 0;
+    transform: translate(-100px, -100px);
+    will-change: transform;
+  }
+  .tour-ghost__count {
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: rgba(10, 15, 30, 0.85);
+    color: #22d3ee;
+    font-size: 0.6875rem;
+  }
+  .tour-marquee {
+    position: fixed;
+    z-index: 100000;
+    pointer-events: none;
+    border: 1px solid rgba(34, 211, 238, 0.9);
+    background: rgba(34, 211, 238, 0.14);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tour-ripple { animation: none; }
   }
 
   /* 離螢幕匯出舞台:移出可視範圍(不可用 display:none,否則量不到尺寸/截不到圖) */

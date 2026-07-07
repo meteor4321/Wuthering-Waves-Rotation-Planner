@@ -13,9 +13,17 @@
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useHelpDialog } from '@/composables/state/useHelpDialog'
+import { useSpotlightTour } from '@/composables/state/useSpotlightTour'
 
 const { isOpen, close } = useHelpDialog()
+const tour = useSpotlightTour()
 const { t } = useI18n()
+
+// 重新觀看導覽：關閉本視窗後啟動 Spotlight Tour（會自帶示範資料）。
+function replayTour(): void {
+  close()
+  tour.start()
+}
 
 const isMac = navigator.userAgent.toUpperCase().includes('MAC OS')
 const mod = isMac ? '⌘' : 'Ctrl' // ⌘ / Ctrl
@@ -108,6 +116,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 </li>
               </ul>
             </section>
+
+            <!-- 重新觀看導覽 -->
+            <button type="button" class="help-replay" @click="replayTour">
+              <svg viewBox="0 0 20 20" width="15" height="15" fill="none" aria-hidden="true">
+                <path d="M15.5 6.5A6 6 0 1 0 16 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M15.5 3.5v3.2h-3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              {{ t('help.replayTour') }}
+            </button>
           </div>
         </div>
       </div>
@@ -208,6 +225,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(34, 211, 238, 0.75);
+}
+
+/* 重新觀看導覽鈕：置於快捷鍵表下方，青色次要行動樣式 */
+.help-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-radius: 4px;
+  background-color: rgba(34, 211, 238, 0.06);
+  color: rgba(34, 211, 238, 0.95);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.help-replay:hover {
+  background-color: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.7);
+}
+.help-replay:focus-visible {
+  outline: 1px solid rgba(34, 211, 238, 0.6);
+  outline-offset: 1px;
 }
 
 .help-list {
