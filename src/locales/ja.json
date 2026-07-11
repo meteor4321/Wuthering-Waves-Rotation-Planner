@@ -185,6 +185,8 @@
     "exportFailed": "エクスポート失敗：{msg}",
     "copied": "コピーしました",
     "copiedN": "{n} 個のブロックをコピーしました",
+    "undone": "元に戻しました",
+    "redone": "やり直しました",
     "templateExists": "同じブロックが既にライブラリにあります",
     "templatesAllExist": "選択したブロックはすべてライブラリに存在します",
     "templateAdded": "テンプレートライブラリに追加しました",

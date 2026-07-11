@@ -185,6 +185,8 @@
     "exportFailed": "导出失败：{msg}",
     "copied": "已复制",
     "copiedN": "已复制 {n} 个区块",
+    "undone": "已撤销",
+    "redone": "已重做",
     "templateExists": "模板库已有相同区块",
     "templatesAllExist": "所选区块均已存在于模板库",
     "templateAdded": "已添加至模板库",

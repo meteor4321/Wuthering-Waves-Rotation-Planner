@@ -185,6 +185,8 @@
     "exportFailed": "Export failed: {msg}",
     "copied": "Copied",
     "copiedN": "Copied {n} blocks",
+    "undone": "Undone",
+    "redone": "Redone",
     "templateExists": "An identical template already exists",
     "templatesAllExist": "All selected blocks already exist in the library",
     "templateAdded": "Added to template library",
