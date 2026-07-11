@@ -644,10 +644,6 @@ async function handleDeselectCharacter(): Promise<void> {
 .header__deselect:focus-visible {
   opacity: 1;
 }
-/* 導覽示範：強制顯示取消選角鈕（CSS :hover 無法用合成事件觸發）。 */
-.swimlane__header--tour-hover .header__deselect {
-  opacity: 1;
-}
 .header__deselect:hover {
   color: #f87171;
   border-color: rgba(248, 113, 113, 0.6);

@@ -39,6 +39,8 @@ function tourRefresh(token: number): void {
 
 let cursorEl: HTMLElement | null = null;
 let runToken = 0;
+// 進行中真實拖曳的「同步非提交式中止」入口（由 realDrag 設定，cancelDemo 呼叫）。
+let abortDrag: (() => void) | null = null;
 
 class CancelledError extends Error {}
 
@@ -293,6 +295,7 @@ async function realDrag(sourceEl: HTMLElement, target: Pt, token: number, hold =
   REAL_EVENTS.forEach((t) => window.addEventListener(t, swallowReal, true));
   let downFired = false;
   let upFired = false;
+  let cleaned = false;
   // 送出放開事件（在座標下真實元素派發，冒泡到 document 讓 SortableJS 結束拖曳）。
   const release = (x: number, y: number): void => {
     if (upFired) return;
@@ -300,6 +303,27 @@ async function realDrag(sourceEl: HTMLElement, target: Pt, token: number, hold =
     const dropEl = document.elementFromPoint(x, y) ?? document;
     fireDrag(dropEl, 'up', x, y);
   };
+  // 同步收尾（idempotent）。aborted=true：以「非提交式」結束——先把游標移到畫面外，
+  // 讓 App 落點預覽清為 null，再放開，使 SortableJS 結束但 commitDrop 無合法落點、不改 store
+  // （避免中途切步驟時，commitDrop 於下一步 resetDemoBoard 之後才落地而污染版面）。
+  // 也保證「只要按下過就一定放開」，否則浮動分身會黏在使用者真實滑鼠上。
+  const cleanup = (aborted: boolean): void => {
+    if (cleaned) return;
+    cleaned = true;
+    if (downFired && !upFired) {
+      if (aborted) {
+        fireDrag(document, 'move', -99999, -99999);
+        release(-99999, -99999);
+      } else {
+        release(target.x, target.y);
+      }
+    }
+    REAL_EVENTS.forEach((t) => window.removeEventListener(t, swallowReal, true));
+    document.body.classList.remove('tour-dragging');
+    blockers.forEach((el, i) => (el.style.pointerEvents = savedPE[i]));
+    abortDrag = null;
+  };
+  abortDrag = () => cleanup(true); // 供 cancelDemo 於切步驟時「同步」中止拖曳
   try {
     const sr = sourceEl.getBoundingClientRect();
     const start: Pt = { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 };
@@ -313,13 +337,10 @@ async function realDrag(sourceEl: HTMLElement, target: Pt, token: number, hold =
     await sleep(hold, token); // 於落點略停（刪除區可加長，讓紅色警告態看清楚）
     release(target.x, target.y);
     await sleep(200, token);
-  } finally {
-    // 保底：只要按下過就一定送出放開，否則（例如中途被取消）SortableJS 拖曳不會結束，
-    // 浮動分身會黏在使用者真實滑鼠上。
-    if (downFired) release(target.x, target.y);
-    REAL_EVENTS.forEach((t) => window.removeEventListener(t, swallowReal, true));
-    document.body.classList.remove('tour-dragging');
-    blockers.forEach((el, i) => (el.style.pointerEvents = savedPE[i]));
+    cleanup(false);
+  } catch (e) {
+    cleanup(true); // 被取消（CancelledError）→ 非提交式收尾
+    throw e;
   }
 }
 
@@ -337,12 +358,12 @@ async function demoStep2(token: number): Promise<void> {
   const gp = genTab ? centerOf(genTab) : null;
   if (gp) {
     cursorInstant(gp.x - 46, gp.y + 34);
-    await moveTo(gp.x, gp.y, 800, token);
+    await moveTo(gp.x, gp.y, 600, token);
     await sleep(300, token);
     clickFx(gp);
     genTab!.click();
   }
-  await sleep(950, token);
+  await sleep(650, token);
 
   // 2) 移到最後一個通用區塊、略停（spotlight 全程在排軸板，無需中途換焦點）
   const chips = [...document.querySelectorAll<HTMLElement>('#tabpanel-general .chip-wrapper')];
@@ -382,18 +403,19 @@ async function demoStep3(token: number): Promise<void> {
   const ap = centerOf(addBtn);
   if (ap) {
     cursorInstant(ap.x - 40, ap.y + 40);
-    await moveTo(ap.x, ap.y, 850, token);
+    await moveTo(ap.x, ap.y, 650, token);
     await sleep(300, token);
     clickFx(ap);
   }
   addBtn.click(); // 真實新增空白區塊 + 進入行內編輯（輸入框自動聚焦）
-  await sleep(750, token); // 等 nextTick 渲染輸入框並聚焦
+  await sleep(550, token); // 等 nextTick 渲染輸入框並聚焦
 
   // 2) 逐字輸入「EA」→ 按 Enter 提交
   const input = document.querySelector('.rotation-block__input') as HTMLInputElement | null;
   if (!input) return;
+  input.readOnly = true; // 純觀看：使用者打不進字；程式設值 + 派發 input 事件仍有效
   const ip = centerOf(input);
-  if (ip) await moveTo(ip.x, ip.y, 500, token);
+  if (ip) await moveTo(ip.x, ip.y + 20, 500, token);
   await sleep(300, token);
   await typeInto(input, 'EA', token);
   await sleep(550, token);
@@ -421,7 +443,7 @@ async function demoStep4(token: number): Promise<void> {
     clickFx(cp);
     customTab!.click();
   }
-  await sleep(900, token);
+  await sleep(800, token);
 
   // 2) 焦點擴大到側邊欄＋排軸板，再移到 c1 的「RZ」區塊並停留
   tourRefocus(token, '.app-layout');
@@ -429,16 +451,16 @@ async function demoStep4(token: number): Promise<void> {
   const rz = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')]
     .find((b) => b.textContent?.trim() === 'RZ');
   if (!rz) return;
-  const rp = await moveToEl(rz, 850, token);
+  const rp = await moveToEl(rz, 650, token);
   rz.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // 顯示 hover 態
-  if (rp) await sleep(800, token);
+  if (rp) await sleep(600, token);
 
   // 3) 真實拖曳 RZ 到側邊欄自訂區並放開（落點在 data-sidebar-zone 內 → 存成模板）
   const panel = (document.getElementById('tabpanel-custom')
     ?? document.querySelector('.sidebar-panel')) as HTMLElement | null;
   const target = panel ? centerOf(panel) : null;
   if (target) await realDrag(rz, target, token);
-  await sleep(1200, token);
+  await sleep(1000, token);
 }
 
 /**
@@ -456,30 +478,38 @@ async function demoStep5(token: number): Promise<void> {
   const id = last.getAttribute('data-entry-id');
 
   // 1) 移到最後一個區塊 → 聚焦高亮該塊
-  const p = await moveToEl(last, 850, token);
+  const p = await moveToEl(last, 950, token);
   last.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
   if (id) tourRefocus(token, `[data-entry-id="${id}"]`);
-  await sleep(700, token);
+  await sleep(1000, token);
 
   // 2) 雙擊進入編輯（RotationBlock @dblclick → startEditing，輸入框自動聚焦全選）
   if (p) clickFx(p);
   last.dispatchEvent(new MouseEvent('dblclick', {
     bubbles: true, cancelable: true, clientX: p?.x, clientY: p?.y, view: window,
   }));
-  await sleep(850, token); // 停一會兒等輸入框出現
+  await sleep(800, token); // 停一會兒等輸入框出現
+
+  // 移動鼠標到label下方避免遮擋
+  const lp = last ? centerOf(last) : null;
+  if (lp) {
+    await moveTo(lp.x, lp.y + 20, 500, token);
+    await sleep(300, token);
+  }
 
   const input = document.querySelector('.rotation-block__input') as HTMLInputElement | null;
   if (!input) return;
+  input.readOnly = true; // 純觀看：使用者打不進字；程式設值 + 派發 input 事件仍有效
   await sleep(350, token);
-  // 進場已全選原文字；typeInto 直接改寫 value → 逐字替換為「AQ」。
+  // 進場已全選原文字；typeInto 直接改寫 value → 逐字替換為「EQ」。
   // 每字後重畫遮罩，使 spotlight 隨區塊變寬同步擴張。
-  await typeInto(input, 'AQ', token, () => tourRefresh(token));
+  await typeInto(input, 'EQ', token, () => tourRefresh(token));
   await sleep(550, token);
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
   // 提交後輸入框換回 chip，尺寸再變 → 等渲染完成後再重畫一次遮罩。
   await sleep(120, token);
   tourRefresh(token);
-  await sleep(1200, token);
+  await sleep(1000, token);
 }
 
 /** 在指定區塊上派發一次點擊（可帶 Ctrl 作多選）。直接派發於元件，繞過遮罩。 */
@@ -542,10 +572,10 @@ async function demoStep6(token: number): Promise<void> {
   if (p) clickFx(p);
   clickBlock(eBlock, p, true);
   await sleep(550, token);
-  p = await moveToEl(aBlock, 700, token);
+  p = await moveToEl(aBlock, 500, token);
   if (p) clickFx(p);
   clickBlock(aBlock, p, true);
-  await sleep(950, token);
+  await sleep(650, token);
 
   // 3) 就近點右側空白處 → 清除選取（冒泡到 app-root @click clearAllSelection）。
   //    不必移到最下方，2A 右側同列即為空白（c2 只有 E、2A 兩塊）。
@@ -554,29 +584,29 @@ async function demoStep6(token: number): Promise<void> {
     const ar = aBlock.getBoundingClientRect();
     const bs = boardScroll.getBoundingClientRect();
     const blank: Pt = { x: Math.min(ar.right + 64, bs.right - 20), y: ar.top + ar.height / 2 };
-    await moveTo(blank.x, blank.y, 650, token);
+    await moveTo(blank.x, blank.y, 550, token);
     clickFx(blank);
     boardScroll.dispatchEvent(new MouseEvent('click', {
       bubbles: true, cancelable: true, view: window, clientX: blank.x, clientY: blank.y, button: 0,
     }));
-    await sleep(950, token);
+    await sleep(650, token);
   }
 
   // 4) 拉出選取框再次框選這兩塊
   await marqueeSelect(eBlock, aBlock, token);
-  await sleep(950, token);
+  await sleep(750, token);
 
   // 5) 多選拖曳到泳道 header 右緣附近（track 起點），不必拖到最左邊。
   const track = document.querySelector('[data-slot-index="1"] .swimlane__track') as HTMLElement | null;
   const cr = track?.getBoundingClientRect();
   if (cr) {
     // 先把指標從框選終點平滑移到要拖的區塊，避免直接起拖時指標瞬移（看似瞬移）。
-    await moveToEl(eBlock, 700, token);
+    await moveToEl(eBlock, 500, token);
     await sleep(250, token);
     const target: Pt = { x: cr.left + 24, y: cr.top + cr.height / 2 };
     await realDrag(eBlock, target, token); // eBlock 仍在選取集合 → 整組多選拖曳
   }
-  await sleep(1200, token);
+  await sleep(800, token);
 }
 
 /**
@@ -665,11 +695,18 @@ export function runDemo(step: number): void {
     });
 }
 
-/** 取消目前示範動畫並收起指標；同時清掉可能殘留的強制 hover class。 */
+/** 取消目前示範動畫並同步收拾所有暫態：指標、進行中拖曳（非提交式）、角色下拉、確認框。 */
 export function cancelDemo(): void {
   runToken++;
   hideCursor();
-  document
-    .querySelectorAll('.swimlane__header--tour-hover')
-    .forEach((el) => el.classList.remove('swimlane__header--tour-hover'));
+  // 同步收掉進行中的真實拖曳（非提交式，不改動 store），避免中途切步驟後
+  // commitDrop 於下一步 resetDemoBoard 之後才落地而污染版面。
+  abortDrag?.();
+  // 角色下拉靠 document 的 mousedown（點在 root/listbox 外）關閉；
+  // 只在確實有開著（listbox 已 Teleport 到 body）時派發，避免多餘副作用。
+  if (document.querySelector('.char-selector__listbox')) {
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  }
+  // 關掉示範中可能開著的確認框（如 step1 換角確認），避免殘留在畫面上。
+  (document.querySelector('.dialog-overlay .dialog__btn--cancel') as HTMLElement | null)?.click();
 }

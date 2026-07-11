@@ -26,6 +26,7 @@ import { useCharacterStore } from '@/stores/useCharacterStore';
 import { useTemplateStore } from '@/stores/useTemplateStore';
 import { useLaneOrder } from '@/composables/state/useLaneOrder';
 import { useHistory } from '@/composables/state/useHistory';
+import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse';
 import { runDemo, cancelDemo, setTourApi } from '@/composables/state/useTourDemo';
 import type { CharacterSlots, SlotIndex } from '@/types/character';
 import type { RotationAxis, RotationEntry } from '@/types/rotation';
@@ -55,6 +56,8 @@ let driverObj: Driver | null = null;
 // 抑制旗標：demo 內用 driver.highlight 移動焦點時，driver 會內部觸發 onDeselected，
 // 若不抑制會誤把正在播放的 demo 取消。refocus 期間暫設 true。
 let suppressCancel = false;
+// 導覽開始前的側邊欄收合狀態；導覽期間強制展開（step2/4 需要側邊欄），結束時還原。
+let sidebarWasCollapsed = false;
 
 /** 把 spotlight 焦點移到選擇器指向的元件，保留當前步驟氣泡（供 demo 中途換焦點）。 */
 function refocus(selector: string): void {
@@ -269,9 +272,9 @@ function buildSteps(): DriveStep[] {
       onHighlighted: () => { resetDemoBoard(); runDemo(4); },
     },
     { ...step(5, '[data-slot-index="0"]', 'left', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(5); } },
-    { ...step(6, '.rotation-board', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(6); } },
+    { ...step(6, '.board__lanes', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(6); } },
     { ...step(7, '.rotation-board', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(7); } },
-    { ...step(8, '.rotation-board', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(8); } },
+    { ...step(8, '.board__lanes', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(8); } },
     step(9, '.axis-tabbar', 'top', 'center'),
     // ── 收尾三步（固定掛最末端；未來新步驟插在本行之前）──
     namedStep('Teams', '[data-tour="teams"]', 'bottom', 'end'),
@@ -280,30 +283,92 @@ function buildSteps(): DriveStep[] {
   ];
 }
 
-/** capture-phase A/D 攔截：覆蓋原區塊巡覽，改作導覽上一步/下一步。 */
+// ── Spotlight 邊框環（掛在 body，避開 overflow 裁切）─────────────────
+// 高亮元素的 box-shadow 光暈會被 .rotation-board/.board__scroll 等 overflow:hidden
+// 祖先裁切、也被暗遮罩(z-index 10000)蓋住。改用獨立 fixed 元素畫發光框，
+// 以 rAF 每幀跟隨 .driver-active-element 的實際位置（含 demo 中尺寸變動）。
+let stageRing: HTMLElement | null = null;
+let ringRaf = 0;
+function startStageRing(): void {
+  if (!stageRing) {
+    stageRing = document.createElement('div');
+    stageRing.className = 'tour-stage-ring';
+    document.body.appendChild(stageRing);
+  }
+  const pad = 6; // 對齊 driver stagePadding
+  const tick = (): void => {
+    const el = document.querySelector('.driver-active-element');
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const s = stageRing!.style;
+      s.opacity = '1';
+      s.left = `${r.left - pad}px`;
+      s.top = `${r.top - pad}px`;
+      s.width = `${r.width + pad * 2}px`;
+      s.height = `${r.height + pad * 2}px`;
+    } else if (stageRing) {
+      stageRing.style.opacity = '0';
+    }
+    ringRaf = requestAnimationFrame(tick);
+  };
+  ringRaf = requestAnimationFrame(tick);
+}
+function stopStageRing(): void {
+  if (ringRaf) cancelAnimationFrame(ringRaf);
+  ringRaf = 0;
+  stageRing?.remove();
+  stageRing = null;
+}
+
+/** capture-phase 鍵盤攔截：A/D 導覽上一步/下一步；其餘實體按鍵一律攔下（純觀看）。 */
 function onTourKeydown(event: KeyboardEvent): void {
   if (!isActive.value || !driverObj) return;
+  // demo 自己派發的合成鍵盤事件（isTrusted=false，如 step3/5 的 Enter 提交）放行。
+  if (!event.isTrusted) return;
   const key = event.key.toLowerCase();
   if (key === 'd') {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     driverObj.moveNext();
-  } else if (key === 'a') {
+    return;
+  }
+  if (key === 'a') {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     // 第一步再往前會被 driver 視為關閉導覽 → 首步時忽略「上一步」。
     if ((driverObj.getActiveIndex() ?? 0) > 0) driverObj.movePrevious();
+    return;
+  }
+  // ESC 交給 driver 處理關閉，不攔。
+  if (event.key === 'Escape') return;
+  // 其餘實體按鍵一律攔截：導覽為純觀看，避免污染示範版面
+  // （在 step3/5 的輸入框打字、Delete 刪除、Ctrl+Z/A/C/V、Tab 收合側邊欄等）。
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+/** capture-phase 攔掉導覽期間的實體輸入類事件（貼上/輸入/剪下/拖放），防止污染示範版面。 */
+function onTourBlockInput(event: Event): void {
+  if (!isActive.value) return;
+  if (event.isTrusted) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
 }
+const TOUR_BLOCK_EVENTS = ['paste', 'beforeinput', 'cut', 'drop'];
 
 /** driver 於完成/關閉/Esc 統一呼叫：卸監聽、取消示範、還原版面、收尾。 */
 function handleDestroyed(): void {
   window.removeEventListener('keydown', onTourKeydown, true);
+  TOUR_BLOCK_EVENTS.forEach((e) => window.removeEventListener(e, onTourBlockInput, true));
   document.body.classList.remove('tour-active');
+  stopStageRing();
   setTourApi(null);
   suppressCancel = false;
   cancelDemo();
   restore();
+  // 還原導覽開始前的側邊欄收合狀態。
+  useSidebarCollapse().collapsed.value = sidebarWasCollapsed;
   isActive.value = false;
   driverObj = null;
 }
@@ -319,12 +384,17 @@ export function useSpotlightTour() {
     }
 
     injectDemo();
+    // 側邊欄若原本收合，導覽期間強制展開（step2/4 需要可見的側邊欄）；結束時還原。
+    const sidebar = useSidebarCollapse();
+    sidebarWasCollapsed = sidebar.collapsed.value;
+    sidebar.collapsed.value = false;
     hasSeenTour.value = true;
     persistSeen();
     isActive.value = true;
     // 導覽期間旗標：抬升被 Teleport 的真實 UI（角色下拉、確認框）與示範指標
     // 的 z-index，使其顯示於 driver 遮罩（z-index 1e9）之上。
     document.body.classList.add('tour-active');
+    startStageRing();
 
     driverObj = driver({
       showProgress: true,
@@ -333,8 +403,9 @@ export function useSpotlightTour() {
       // （內部 __transitionCallback 守衛），且 demo 的 refocus(highlight) 也會觸發過場，
       // 導致快速切步驟時 spotlight 卡在半途/上一步。改為瞬間定位，切步驟即時、不殘留。
       animate: false,
-      // 點遮罩空白處即關閉導覽。
-      overlayClickBehavior: 'close',
+      // 點遮罩空白處「不做任何事」：導覽為純觀看，避免使用者誤點空白中斷示範。
+      // driver 執行期支援傳入函式（no-op）；ESC／關閉鈕／完成鈕仍可正常結束（allowClose 維持 true）。
+      overlayClickBehavior: (() => {}) as unknown as 'close',
       // 導覽為純觀看：鎖住 spotlight 內元件的互動（示範效果由程式驅動，
       // 不依賴真實 DOM 事件），避免使用者誤操作示範版面。
       disableActiveInteraction: true,
@@ -359,6 +430,7 @@ export function useSpotlightTour() {
     // 提供 demo 中途移動 spotlight 焦點、重算遮罩的能力（如步驟 2/5）。
     setTourApi({ refocus, refresh: () => driverObj?.refresh() });
     window.addEventListener('keydown', onTourKeydown, true);
+    TOUR_BLOCK_EVENTS.forEach((e) => window.addEventListener(e, onTourBlockInput, true));
     // 等示範資料渲染出泳道/區塊元件後再啟動定位。
     nextTick(() => driverObj?.drive());
   }

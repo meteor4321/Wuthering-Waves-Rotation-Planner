@@ -265,23 +265,30 @@ function clearAllSelection(): void {
 
   /* ── 功能導覽（driver.js）暗色主題：套 popoverClass='tour-popover' ── */
   .driver-popover.tour-popover {
-    background-color: #131c2e;
-    border: 1px solid rgba(34, 211, 238, 0.65);
+    background-color: #243456;
+    border: 1px solid rgba(34, 211, 238, 0.75);
     border-radius: 8px;
     box-shadow:
-      0 0 0 1px rgba(34, 211, 238, 0.25),
-      0 0 24px -4px rgba(34, 211, 238, 0.35),
+      0 0 0 1px rgba(34, 211, 238, 0.3),
+      0 0 24px -4px rgba(34, 211, 238, 0.4),
       0 24px 70px -12px rgba(0, 0, 0, 0.9);
     color: rgba(240, 244, 248, 0.92);
     font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
     max-width: 20rem;
   }
-  /* spotlight 高亮框：加青色光暈環，讓聚焦更明顯 */
-  .driver-active-element {
+  /* spotlight 發光邊框：獨立 fixed 元素（見 useSpotlightTour startStageRing），
+     以 rAF 跟隨高亮元素。用獨立元素而非高亮元素的 box-shadow，可避開
+     .rotation-board/.board__scroll 等 overflow:hidden 祖先的裁切，並疊在暗遮罩(10000)之上。 */
+  .tour-stage-ring {
+    position: fixed;
+    z-index: 10001;
+    pointer-events: none;
+    border: 2px solid rgba(34, 211, 238, 0.833);
+    border-radius: 6px;
     box-shadow:
-      0 0 0 2px rgba(34, 211, 238, 0.9),
-      0 0 22px 2px rgba(34, 211, 238, 0.55) !important;
-    border-radius: 8px;
+      0 0 22px 3px rgba(34, 211, 238, 0.55),
+      0 0 0 1px rgba(34, 211, 238, 0.5);
+    opacity: 0;
   }
   .driver-popover.tour-popover .driver-popover-title {
     font-size: 0.9375rem;
@@ -299,11 +306,15 @@ function clearAllSelection(): void {
     letter-spacing: 0.08em;
     color: rgba(34, 211, 238, 0.7);
   }
-  /* 箭頭配合暗底上色（driver 以 border 畫三角，逐邊覆寫） */
-  .driver-popover.tour-popover .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: #0d1320; }
-  .driver-popover.tour-popover .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: #0d1320; }
-  .driver-popover.tour-popover .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: #0d1320; }
-  .driver-popover.tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #0d1320; }
+  /* 箭頭：填色同氣泡底（融為氣泡一部分），再加青色光暈讓「發光邊框」在箭頭處也連成一圈，
+     避免箭頭與相近的頁面底色混在一起看不見。 */
+  .driver-popover.tour-popover .driver-popover-arrow {
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.95));
+  }
+  .driver-popover.tour-popover .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: #243456; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: #243456; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: #243456; }
+  .driver-popover.tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: #243456; }
 
   .driver-popover.tour-popover .driver-popover-footer button {
     background-color: rgba(255, 255, 255, 0.05);
@@ -382,45 +393,6 @@ function clearAllSelection(): void {
   @keyframes tour-ripple {
     0% { transform: scale(0.3); opacity: 0.9; }
     100% { transform: scale(3.2); opacity: 0; }
-  }
-  /* 拖曳分身：模仿被拖 chip 的浮起外觀，跟隨虛擬指標 */
-  .tour-ghost {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 100000;
-    pointer-events: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: 6px;
-    background: var(--ghost-bg, #22d3ee);
-    color: #0a0f1e;
-    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.25);
-    opacity: 0;
-    transform: translate(-100px, -100px);
-    will-change: transform;
-  }
-  .tour-ghost__count {
-    padding: 0 0.3rem;
-    border-radius: 999px;
-    background: rgba(10, 15, 30, 0.85);
-    color: #22d3ee;
-    font-size: 0.6875rem;
-  }
-  .tour-marquee {
-    position: fixed;
-    z-index: 100000;
-    pointer-events: none;
-    border: 1px solid rgba(34, 211, 238, 0.9);
-    background: rgba(34, 211, 238, 0.14);
-    border-radius: 2px;
-    opacity: 0;
-    transition: opacity 0.15s ease;
   }
   @media (prefers-reduced-motion: reduce) {
     .tour-ripple { animation: none; }
