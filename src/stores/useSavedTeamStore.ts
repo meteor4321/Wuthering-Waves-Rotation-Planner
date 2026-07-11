@@ -5,7 +5,8 @@
 // 列出/置頂/刪除/改名、載入（覆蓋當前工作區）、LocalStorage 持久化。
 // 持久化樣式比照 useTemplateStore（try/catch 讀、deep watch 寫）。
 //
-// 「當前隊伍」機制：載入/另存/覆蓋/建立空隊伍後，記住正在編輯的存檔 id
+// 「當前隊伍」機制：載入/另存/覆蓋後，記住正在編輯的存檔 id；建立空隊伍
+// 則重置工作區並解除綁定（回自由模式）。
 // （currentTeamId，另存於 LocalStorage）。修改留在工作區、不自動寫回；按「儲存
 // 變更」才覆蓋回該存檔。isDirty 比對工作區與存檔快照，供 UI 判斷是否有未存變更、
 // 並在載入他檔/建空隊等會捨棄內容的動作前跳警告。無綁定（自由模式）時，isDirty
@@ -119,12 +120,15 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
     };
   }
 
-  /** 把狀態快照序列化為字串，供內容比對（忽略名稱/時間等 meta 欄位）。 */
+  /**
+   * 把狀態快照序列化為字串，供內容比對（忽略名稱/時間等 meta 欄位）。
+   * 刻意不含 activeAxisId：切換聚焦分頁只是檢視狀態、非內容變更，
+   * 不應觸發 isDirty 逼使用者手動儲存（該值仍照常存檔，只是不參與髒判定）。
+   */
   function serializeState(s: StateSnapshot): string {
     return JSON.stringify({
       slots: s.slots,
       axes: s.axes,
-      activeAxisId: s.activeAxisId,
       laneOrder: s.laneOrder,
     });
   }
@@ -201,33 +205,31 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
   }
 
   /**
-   * 建立空隊伍：無角色、單一空白軸的新存檔，建立後立即載入編輯。
-   * 回傳新 id（重名或空名回 null）。
+   * 建立空隊伍：把工作區重置為全新空白狀態（無角色、單一空白軸）並解除
+   * 當前隊伍綁定（回到自由模式）。不建立存檔、不需命名；可由 Undo 還原。
    */
-  function createEmptyTeam(name: string): string | null {
-    const trimmed = name.trim();
-    if (trimmed === '' || isNameTaken(trimmed)) return null;
+  function createEmptyWorkspace(): void {
+    const rotationStore = useRotationStore();
+    const characterStore = useCharacterStore();
+    const { laneOrder } = useLaneOrder();
 
-    const now = Date.now();
+    // 重置前記錄快照 → 可被 Undo 還原。
+    useHistory().record();
+
     const axisId = generateUUID();
-    const team: SavedTeam = {
-      id: generateUUID(),
-      name: trimmed,
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      slots: [
-        { slotIndex: 0, character: null },
-        { slotIndex: 1, character: null },
-        { slotIndex: 2, character: null },
-      ],
-      axes: [{ id: axisId, name: t('axis.defaultName', { n: 1 }), entries: [] }],
-      activeAxisId: axisId,
-      laneOrder: [0, 1, 2],
-    };
-    teams.value = [...teams.value, team];
-    loadTeam(team.id);
-    return team.id;
+    rotationStore.axes = [{ id: axisId, name: t('axis.defaultName', { n: 1 }), entries: [] }];
+    characterStore.slots = [
+      { slotIndex: 0, character: null },
+      { slotIndex: 1, character: null },
+      { slotIndex: 2, character: null },
+    ];
+    laneOrder.value = [0, 1, 2];
+    rotationStore.setActiveAxis(axisId);
+
+    rotationStore.clearSelection();
+    rotationStore.stopEditing();
+
+    currentTeamId.value = null;
   }
 
   /** 載入存檔：覆蓋當前工作區（可由 Undo 還原），並綁定為當前隊伍。 */
@@ -289,7 +291,7 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
     saveCurrent,
     saveToCurrent,
     overwriteTeam,
-    createEmptyTeam,
+    createEmptyWorkspace,
     loadTeam,
     deleteTeam,
     togglePin,

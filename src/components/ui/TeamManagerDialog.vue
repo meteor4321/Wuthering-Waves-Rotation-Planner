@@ -8,25 +8,24 @@
 // 視覺沿用 ExportDialog.vue 的暗色 / clip-path 慣例。
 // ============================================================
 
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useTeamManager } from '@/composables/state/useTeamManager'
 import { useSavedTeamStore } from '@/stores/useSavedTeamStore'
 import { useDialog } from '@/composables/state/useDialog'
 import { useToast } from '@/composables/state/useToast'
 import { characterDisplayName } from '@/i18n'
+import { getElementColor } from '@/constants/elements'
 import { useI18n } from 'vue-i18n'
 import type { SavedTeam } from '@/types/savedTeam'
 
-const { isOpen, close } = useTeamManager()
+const { isOpen, saveAsRequested, close } = useTeamManager()
 const store = useSavedTeamStore()
 const { confirm } = useDialog()
 const { showToast } = useToast()
 const { t } = useI18n()
 
-// ── 行內命名：另存新檔 / 建立空隊伍 共用同一個輸入列（以 saveMode 區分） ──
-type SaveMode = 'saveAs' | 'create'
+// ── 行內命名：另存新檔的名稱輸入列 ──────────────────────────
 const isSaving = ref(false)
-const saveMode = ref<SaveMode>('saveAs')
 const saveName = ref('')
 const saveInputRef = ref<HTMLInputElement | null>(null)
 
@@ -35,32 +34,14 @@ const nameTaken = computed(
 )
 const canSave = computed(() => saveName.value.trim() !== '' && !nameTaken.value)
 
-function beginSave(mode: SaveMode): void {
-  saveMode.value = mode
+function beginSave(): void {
   isSaving.value = true
   saveName.value = ''
   void nextTick(() => saveInputRef.value?.focus())
 }
 
-async function commitSave(): Promise<void> {
+function commitSave(): void {
   if (!canSave.value) return
-  if (saveMode.value === 'create') {
-    // 建立空隊伍會即刻載入 → 捨棄當前工作區內容，有未存變更時先確認。
-    if (store.isDirty) {
-      const ok = await confirm({
-        title: t('teams.discardTitle'),
-        message: t('teams.discardMessage'),
-        confirmText: t('teams.discardConfirm'),
-        danger: true,
-      })
-      if (!ok) return
-    }
-    store.createEmptyTeam(saveName.value)
-    showToast(t('teams.createdToast', { name: saveName.value.trim() }), 'success')
-    cancelSave()
-    close()
-    return
-  }
   store.saveCurrent(saveName.value)
   showToast(t('teams.savedToast', { name: saveName.value.trim() }), 'success')
   isSaving.value = false
@@ -72,6 +53,31 @@ function cancelSave(): void {
   saveName.value = ''
 }
 
+// Ctrl+Shift+S 開啟管理頁時直接進入另存命名（消費旗標後清除）。
+watch(isOpen, (open) => {
+  if (open && saveAsRequested.value) {
+    saveAsRequested.value = false
+    beginSave()
+  }
+})
+
+// ── 建立空隊伍：免命名，直接重置工作區進入自由模式 ──────────────
+async function handleCreateEmpty(): Promise<void> {
+  // 重置會捨棄當前工作區內容，有未存變更時先確認。
+  if (store.isDirty) {
+    const ok = await confirm({
+      title: t('teams.discardTitle'),
+      message: t('teams.discardMessage'),
+      confirmText: t('teams.discardConfirm'),
+      danger: true,
+    })
+    if (!ok) return
+  }
+  store.createEmptyWorkspace()
+  showToast(t('teams.createdToast'), 'success')
+  close()
+}
+
 // ── 儲存變更：覆蓋當前綁定的存檔 ──────────────────────────────
 function handleSaveToCurrent(): void {
   const team = store.currentTeam
@@ -80,14 +86,19 @@ function handleSaveToCurrent(): void {
   showToast(t('teams.savedToast', { name: team.name }), 'success')
 }
 
-// ── 每列顯示：三角色（依存檔泳道順序）＋ 軸名清單 ──────────────
-function laneCharacterNames(team: SavedTeam): string[] {
-  return team.laneOrder.map((si) => {
-    const slot = team.slots.find((s) => s.slotIndex === si)
-    return slot?.character
-      ? characterDisplayName(slot.character)
-      : t('sidebar.characterFallback', { n: si + 1 })
-  })
+// ── 每列顯示：已選角色（依存檔泳道順序、空位略過）＋ 軸名清單 ────
+interface CharChip {
+  name: string
+  color: string // 屬性代表色（文字著色 + 邊框淡色）
+}
+function laneCharacterChips(team: SavedTeam): CharChip[] {
+  return team.laneOrder
+    .map((si) => team.slots.find((s) => s.slotIndex === si)?.character ?? null)
+    .filter((c): c is NonNullable<typeof c> => c != null)
+    .map((c) => ({
+      name: characterDisplayName(c),
+      color: getElementColor(c.element),
+    }))
 }
 
 function axisNames(team: SavedTeam): string {
@@ -237,10 +248,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   : $t('teams.saved') }}
               </button>
               <div class="team-dialog__save-actions">
-                <button type="button" class="team-dialog__mini-btn" @click="beginSave('saveAs')">
+                <button type="button" class="team-dialog__mini-btn" @click="beginSave()">
                   <span aria-hidden="true">＋</span> {{ $t('teams.saveAs') }}
                 </button>
-                <button type="button" class="team-dialog__mini-btn" @click="beginSave('create')">
+                <button type="button" class="team-dialog__mini-btn" @click="handleCreateEmpty">
                   <span aria-hidden="true">＋</span> {{ $t('teams.createEmpty') }}
                 </button>
               </div>
@@ -253,9 +264,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   class="team-save-row__input"
                   :class="{ 'team-save-row__input--error': nameTaken }"
                   type="text"
-                  :placeholder="saveMode === 'create'
-                    ? $t('teams.createNamePlaceholder')
-                    : $t('teams.namePlaceholder')"
+                  :placeholder="$t('teams.namePlaceholder')"
                   @keydown.enter.prevent="commitSave"
                   @keydown.esc.prevent="cancelSave"
                 />
@@ -264,7 +273,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   class="team-save-row__btn team-save-row__btn--confirm"
                   :disabled="!canSave"
                   @click="commitSave"
-                >{{ saveMode === 'create' ? $t('teams.createConfirm') : $t('teams.saveConfirm') }}</button>
+                >{{ $t('teams.saveConfirm') }}</button>
                 <button
                   type="button"
                   class="team-save-row__btn"
@@ -296,10 +305,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 </div>
                 <div class="team-row__chars">
                   <span
-                    v-for="(name, i) in laneCharacterNames(team)"
+                    v-for="(chip, i) in laneCharacterChips(team)"
                     :key="i"
                     class="team-row__char"
-                  >{{ name }}</span>
+                    :style="{ color: chip.color, borderColor: chip.color + '4D' }"
+                  >{{ chip.name }}</span>
                 </div>
                 <div class="team-row__axes">
                   <span class="team-row__axes-label">{{ $t('teams.axesLabel') }}</span>
@@ -549,11 +559,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   white-space: nowrap;
 }
 .team-row__chars { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+/* 角色名以屬性代表色著色（color/borderColor 由行內樣式注入）；
+   深色底 + 淡色描邊確保各屬性色在暗色卡片上可辨。 */
 .team-row__char {
   font-size: 0.6875rem;
+  font-weight: 600;
   padding: 0.1rem 0.4rem;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.3);
   color: rgba(240, 244, 248, 0.72);
 }
 .team-row__axes { display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.6875rem; }
