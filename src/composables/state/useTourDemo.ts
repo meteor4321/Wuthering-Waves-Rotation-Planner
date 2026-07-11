@@ -69,8 +69,6 @@ function sleep(ms: number, token: number): Promise<void> {
 
 interface Pt { x: number; y: number }
 
-let cursorPos: Pt = { x: -100, y: -100 };
-
 function centerOf(target: string | Element | null): Pt | null {
   const el = typeof target === 'string' ? document.querySelector(target) : target;
   if (!el) return null;
@@ -91,7 +89,6 @@ function cursorInstant(x: number, y: number): void {
   const el = ensureCursor();
   el.style.transition = 'none';
   el.style.transform = `translate(${x}px, ${y}px)`;
-  cursorPos = { x, y };
   void el.offsetWidth; // 強制 reflow，讓後續 transition 生效
 }
 
@@ -101,7 +98,6 @@ async function moveTo(x: number, y: number, dur: number, token: number): Promise
   const el = ensureCursor();
   el.style.transition = `transform ${dur}ms cubic-bezier(0.45, 0, 0.2, 1), opacity 0.2s ease`;
   el.style.transform = `translate(${x}px, ${y}px)`;
-  cursorPos = { x, y };
   await sleep(dur, token);
 }
 
@@ -254,7 +250,6 @@ function animateCursor(
       const y = start.y + (target.y - start.y) * e;
       onFrame?.(x, y);
       el.style.transform = `translate(${x}px, ${y}px)`;
-      cursorPos = { x, y };
       if (p < 1) requestAnimationFrame(frame);
       else resolve();
     }

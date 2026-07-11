@@ -84,7 +84,6 @@ async function handleLoad(team: SavedTeam): Promise<void> {
 // ── 每列「⋮」More 選單（teleport popover，仿 SettingsMenu 定位＋點外關閉） ──
 const openMenuId = ref<string | null>(null)
 const menuStyle = ref<Record<string, string>>({})
-const menuRef = ref<HTMLElement | null>(null)
 
 const openTeam = computed<SavedTeam | null>(
   () => store.sortedTeams.find((t) => t.id === openMenuId.value) ?? null
@@ -256,7 +255,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   <Teleport to="body">
     <div
       v-if="openTeam"
-      ref="menuRef"
       class="team-menu"
       :style="menuStyle"
       role="menu"

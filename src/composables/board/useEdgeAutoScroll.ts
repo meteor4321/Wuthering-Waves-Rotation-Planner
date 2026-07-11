@@ -18,7 +18,6 @@ const RIGHT_EDGE_PX = 44  // 右側觸發帶寬度：游標進入容器右緣內
 const LEFT_RAMP_PX = 140  // 左側：游標越過 header 右緣多遠時加速到頂（px）＝緩衝帶寬度
 const MIN_STEP = 4        // 剛進入觸發區的起始速度（px/幀）
 const MAX_STEP = 20       // 左側加速到頂的速度（px/幀）
-const ACCEL_MS = 1000     // 右側：從 MIN_STEP 漸進加速到 RIGHT_MAX_STEP 所需的停留時間(ms)
 // 右側專用：放慢頂速並拉長加速曲線（右緣是物理牆，體感過快 → 獨立調參）。
 const RIGHT_MAX_STEP = 11 // 右側加速到頂的速度（px/幀，較左側 20 慢）
 const RIGHT_ACCEL_MS = 1800 // 右側從 MIN_STEP 加速到頂所需停留時間(ms，較 1000 更緩）
