@@ -138,6 +138,7 @@
     "cut": "剪下選取的區塊",
     "paste": "貼上剪貼簿內容",
     "duplicateRight": "向右複製選取的區塊",
+    "insertBlank": "在選取區塊後插入空白區塊",
     "undo": "復原",
     "redo": "重做",
     "toggleSidebar": "展開／收合側邊欄",

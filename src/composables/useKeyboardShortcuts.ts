@@ -14,23 +14,60 @@
 //   Ctrl+A              → 全選當前輸出軸的所有區塊
 //   Ctrl+Z              → 復原（Undo）
 //   Ctrl+Shift+Z / Ctrl+Y → 重做（Redo）
+//   Space               → 在選取區塊之後插入空白區塊並進入編輯（無選取則不動作）
 //   Escape              → 清除所有選取
 //   Tab                 → 展開／收合側邊欄
 // ============================================================
 
-import { onMounted, onUnmounted } from 'vue';
+import { nextTick, onMounted, onUnmounted } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
+import { useCharacterStore } from '@/stores/useCharacterStore';
 import { useClipboard } from '@/composables/useClipboard';
 import { useBlockNavigation } from '@/composables/board/useBlockNavigation';
+import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse';
 import { useHistory } from '@/composables/state/useHistory';
+import { getElementColor } from '@/constants/elements';
 
 export function useKeyboardShortcuts() {
   const rotationStore = useRotationStore();
+  const characterStore = useCharacterStore();
   const clipboard = useClipboard();
   const nav = useBlockNavigation();
   const sidebarCollapse = useSidebarCollapse();
+  const { scrollEntryIntoView } = useBoardScroll();
   const history = useHistory();
+
+  /**
+   * Space：在「最後一個選取區塊」之後插入同泳道空白區塊並進入行內編輯。
+   * 與 ＋ 按鈕共用同一套交易模式（beginPending；命名/放棄由 Swimlane 的
+   * commit/cancel 收尾成單一可復原步驟）。無選取則不動作。
+   */
+  function insertBlankAfterSelection(): void {
+    const selected = rotationStore.selectedEntries; // 已依 1D 陣列時間序排列
+    if (selected.length === 0) return;
+    const last = selected[selected.length - 1];
+    const character = characterStore.slots[last.slotIndex].character;
+    if (!character) return; // 理論上選取區塊必有角色；保險防呆
+
+    const afterIndex = rotationStore.entries.findIndex((e) => e.id === last.id);
+    history.beginPending();
+    const newId = rotationStore.addFreeformBlock(
+      '',
+      getElementColor(character.element),
+      last.slotIndex,
+      character.id,
+      afterIndex,
+    );
+    // 改選中新區塊 → 連續 Enter 可依出場順序一路接續插入。
+    rotationStore.selectBlocks([newId]);
+    // 插入點可能在可視範圍外（如選取後捲走）→ 不在畫面內才跟隨鏡頭。
+    scrollEntryIntoView(newId, { onlyIfNeeded: true });
+    // 等新區塊渲染進泳道後再標記編輯（RotationBlock 會自動聚焦）。
+    void nextTick(() => {
+      rotationStore.startEditing(newId);
+    });
+  }
 
   // ──────────────────────────────────────────
   // 事件處理器
@@ -58,6 +95,17 @@ export function useKeyboardShortcuts() {
       if (rotationStore.selectedIds.size > 0) {
         event.preventDefault();
         rotationStore.deleteSelectedBlocks();
+      }
+      return;
+    }
+
+    // ── Space：在選取區塊後插入空白區塊 ─────────────────────
+    // 有選取才攔截：preventDefault 擋掉 Space 的原生行為（頁面向下捲動、或焦點
+    // 停在按鈕時觸發 click 造成雙重插入）。無選取則放行，保留原生捲動。
+    if (key === ' ' && !isCtrl && !event.altKey && !event.shiftKey) {
+      if (rotationStore.selectedIds.size > 0) {
+        event.preventDefault();
+        insertBlankAfterSelection();
       }
       return;
     }

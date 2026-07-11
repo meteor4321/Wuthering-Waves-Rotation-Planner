@@ -138,6 +138,7 @@
     "cut": "선택한 블록 잘라내기",
     "paste": "클립보드 내용 붙여넣기",
     "duplicateRight": "선택한 블록을 오른쪽으로 복제",
+    "insertBlank": "선택한 블록 뒤에 빈 블록 삽입",
     "undo": "실행 취소",
     "redo": "다시 실행",
     "toggleSidebar": "사이드바 펼치기／접기",

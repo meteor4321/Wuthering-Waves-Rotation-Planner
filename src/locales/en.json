@@ -138,6 +138,7 @@
     "cut": "Cut selected blocks",
     "paste": "Paste clipboard contents",
     "duplicateRight": "Duplicate selected blocks to the right",
+    "insertBlank": "Insert a blank block after the selection",
     "undo": "Undo",
     "redo": "Redo",
     "toggleSidebar": "Expand/collapse sidebar",

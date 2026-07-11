@@ -171,33 +171,23 @@ function handleBlockSelect(entryId: string, event: MouseEvent): void {
 
 // ── 既有邏輯 ──────────────────────────────────────────────────
 
-// ＋ 按鈕在共用 grid 內的 0-based 欄序：該泳道自己最後一個區塊的欄序 + 1
-// （落在其後一欄，而非整條 grid 末端）。空泳道 → 第 0 欄（靠左）。
+// ＋ 按鈕在共用 grid 內的 0-based 欄序：整條輸出軸「全域最後一欄」+ 1。
+// 三條泳道的 ＋ 落在同一欄 → 垂直對齊於軸末端，配合「插入於全軸末尾」語意
+// （依出場順序接續編輯）。全軸為空 → 第 0 欄（靠左）。
 // 用（非預覽版）欄序即可，因拖曳預覽期間 ＋ 會隱藏。
 const addButtonColumn = computed<number>(() => {
   let lastCol = -1
-  for (const entry of localEntries.value) {
-    const col = props.idToColumnIndex.get(entry.id)
-    if (col != null && col > lastCol) lastCol = col
+  for (const col of props.idToColumnIndex.values()) {
+    if (col > lastCol) lastCol = col
   }
   return lastCol + 1
-})
-
-// 定位本泳道最後一個區塊的全局索引；若為空則回傳全局末尾
-const insertAfterIndex = computed<number>(() => {
-  const globalEntries = rotationStore.entries
-  for (let i = globalEntries.length - 1; i >= 0; i--) {
-    if (globalEntries[i].slotIndex === props.slotIndex) {
-      return i
-    }
-  }
-  return globalEntries.length - 1
 })
 
 // 行內編輯狀態集中於 rotationStore（editingId/editingDraft），讓 RotationBoard
 // 的量測列能即時讀到草稿、據以即時重算欄寬。本泳道只負責觸發與轉發。
 
-// 於本泳道末尾新增空白實體區塊，並立即進入行內編輯讓使用者輸入 label
+// 於「全軸末尾」新增空白實體區塊（歸屬本泳道角色），並立即進入行內編輯。
+// 插在全域 1D 陣列最後 → 依出場順序接續排軸（與 ＋ 按鈕位於軸末端一致）。
 function handleAddBlock(): void {
   if (!props.character) return
   // 開啟交易：新增＋首次命名（或放棄）合併為單一可復原步驟（見 useHistory）。
@@ -207,7 +197,7 @@ function handleAddBlock(): void {
     laneColor.value,
     props.slotIndex,
     props.character.id,
-    insertAfterIndex.value,
+    rotationStore.entries.length - 1,
   )
   // 等 watch 把新區塊渲染進 localEntries 後再標記編輯（RotationBlock 會自動聚焦）
   void nextTick(() => {
@@ -432,7 +422,7 @@ async function handleDeselectCharacter(): Promise<void> {
               aria-hidden="true"
             />
 
-            <!-- ＋ 按鈕：定位在該泳道自己最後一個區塊之後（共用 grid 內以 grid-column 釘位）。
+            <!-- ＋ 按鈕：定位在全軸最後一欄之後（共用 grid 內以 grid-column 釘位，三泳道垂直對齊）。
                  被 SortableJS draggable:'.rotation-block' 選擇器排除，不會被當成可拖項。
                  拖曳預覽期間隱藏，避免與落點空欄搶欄、或造成 grid 欄數變動。 -->
             <button
@@ -774,7 +764,7 @@ async function handleDeselectCharacter(): Promise<void> {
   pointer-events: none;
 }
 
-/* ＋ 按鈕現位於共用 grid 內，用 grid-column 釘在該泳道最後一個區塊之後。
+/* ＋ 按鈕現位於共用 grid 內，用 grid-column 釘在全軸最後一欄之後（三泳道同欄）。
    align-self/justify-self 控制其在欄內的對齊；空泳道（flex fallback）時自然靠左。 */
 /* 拖曳期間隱藏 ＋ 但保留其 grid 欄位（visibility 而非 display:none）：
    display:none 會讓尾端隱式欄收合、scrollWidth 縮短，捲到最右時 scrollLeft 被夾回
