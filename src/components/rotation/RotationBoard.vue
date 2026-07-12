@@ -268,9 +268,56 @@ watch(() => previewLayout.value, (layout) => runFlip(layout.idToX), { flush: 'po
 // ── 邊緣自動捲動 / 框選（R5 抽離）───────────────────────────
 
 const boardScrollRef = ref<HTMLElement | null>(null)
+const boardContentRef = ref<HTMLElement | null>(null)
 
 // 拖曳邊緣自動捲動：每次實際捲動後重算拖曳落點
 const autoScroll = useEdgeAutoScroll(boardScrollRef, notifyAutoScroll)
+
+// ── 欄收合時的最右端捲動保護（sticky header 抖動修正）─────────
+// 欄收合（刪除/拖出/文字變短）使 scrollWidth 縮短、且已捲到最右時，瀏覽器會
+// 自行把 scrollLeft「夾回」合法範圍；但 Blink 的自動夾回與 sticky header 重定位
+// 分屬不同渲染階段 → header 先隨內容位移一幀才歸位（實測夾回後 header 偏左
+// 15px，須等下次捲動/渲染才校正）＝泳道 header 抖動。
+// 對策：不讓瀏覽器夾回。內容縮水的 DOM 更新落地後、任何強制排版讀取「之前」，
+// 先以 min-width 撐住舊內容寬（scrollLeft 全程合法 → 自動夾回不觸發），改用
+// 程式化捲動把畫面移到新的最右端（與使用者捲動同路徑，sticky 同幀更新、不抖），
+// 下一幀再釋放 min-width——此時 scrollLeft 恰等於新 max，寬度縮回不造成偏移變化。
+let _preShrink: { scrollLeft: number; clientWidth: number } | null = null
+
+// 'pre'：DOM 尚未更新，先記下縮水前的捲動狀態（此時讀取不會觸發夾回）。
+watch(previewGridTemplate, () => {
+  const scroll = boardScrollRef.value
+  if (!scroll) return
+  _preShrink = { scrollLeft: scroll.scrollLeft, clientWidth: scroll.clientWidth }
+}, { flush: 'pre' })
+
+// 'post'：DOM 已更新但瀏覽器尚未排版——先撐寬、再量測、再程式化捲動。
+watch(previewGridTemplate, () => {
+  const scroll = boardScrollRef.value
+  const content = boardContentRef.value
+  const prev = _preShrink
+  _preShrink = null
+  if (!scroll || !content || !prev) return
+
+  // 步驟一：任何版面讀取之前先撐住舊寬度（純寫入，不觸發排版）。
+  content.style.minWidth = `${prev.scrollLeft + prev.clientWidth}px`
+
+  // 步驟二：量測「自然」內容寬（此次強制排版帶著撐寬，offset 合法、不會夾回）。
+  // 泳道群為 flex 子項（不被父層 min-width 拉伸），gBCR 即自然寬；尾端留白恆 50cqw。
+  const lanesW = content.querySelector('.board__lanes')?.getBoundingClientRect().width ?? 0
+  const naturalMax = Math.max(0, lanesW + prev.clientWidth * 0.5 - scroll.clientWidth)
+
+  if (scroll.scrollLeft > naturalMax) {
+    // 步驟三：程式化捲動到新的最右端（正常捲動路徑，sticky 與偏移同幀一致）。
+    scroll.scrollLeft = naturalMax
+    // 步驟四：下一幀釋放撐寬。此時 offset === 新 max，縮回不產生任何偏移變化。
+    requestAnimationFrame(() => {
+      content.style.minWidth = ''
+    })
+  } else {
+    content.style.minWidth = ''
+  }
+}, { flush: 'post' })
 
 watch(
   () => dragState.isDragging,
@@ -342,7 +389,7 @@ onMounted(() => {
   >
     <div ref="boardScrollRef" class="board__scroll">
       <!-- 橫向內容列：泳道群 + 尾端留白佔位（讓末端區塊可捲至畫面中央）。 -->
-      <div class="board__content">
+      <div ref="boardContentRef" class="board__content">
         <!-- 泳道依 orderedSlots（laneOrder）排列；TransitionGroup 讓放開後的
              重排平滑滑動（move 過渡）。key 用 slotIndex（與 entries/欄位無關）。 -->
         <TransitionGroup tag="div" class="board__lanes" name="lane">
@@ -442,6 +489,9 @@ onMounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
+  /* 內容增刪時停用瀏覽器「捲動錨定」自動調整捲動位置：錨定補償與 sticky header
+     重定位不同步，是欄收合時 header 抖動的另一來源；捲動位置一律由本元件掌控。 */
+  overflow-anchor: none;
   /* 宣告為容器查詢容器：讓尾端留白與泳道最小寬能以 cqw（可視寬度）定尺寸，
      捲動內容再寬，cqw 仍以「可視視窗寬」為基準（scrollWidth 不影響）。 */
   container-type: inline-size;
