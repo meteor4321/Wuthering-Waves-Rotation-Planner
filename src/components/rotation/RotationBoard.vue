@@ -453,6 +453,14 @@ onMounted(() => {
   cursor: grabbing;
 }
 
+/* 泳道拖曳進行中：所有泳道 header 一律穿透。
+   浮起分身跟游標垂直移動、經過其他泳道 sticky header 上方時，滑鼠 hover 會
+   誤觸角色頭像發光框與「取消選角」鈕浮現；拖曳期間全數禁止互動（比照
+   區塊拖曳的 .swimlane__header--drag-inert）。 */
+.rotation-board--lane-dragging :deep(.swimlane__header) {
+  pointer-events: none;
+}
+
 /* ── 泳道重排平滑滑動（TransitionGroup move）─────────────────── */
 .lane-move {
   transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
