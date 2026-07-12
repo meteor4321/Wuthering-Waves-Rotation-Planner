@@ -27,16 +27,6 @@ export function setTourApi(api: TourApi | null): void {
   tourApi = api;
 }
 
-// spotlight 操作（refocus/refresh）的 token 守衛：快速切步驟時 runDemo 會 cancelDemo
-// （runToken++）殺掉舊 demo，但舊 demo 若剛好在此刻要移動/重畫遮罩，會把 spotlight
-// 拉回上一步元件而殘留。故過期 token 一律略過，不再動遮罩。
-function tourRefocus(token: number, selector: string): void {
-  if (token === runToken) tourApi?.refocus(selector);
-}
-function tourRefresh(token: number): void {
-  if (token === runToken) tourApi?.refresh();
-}
-
 let cursorEl: HTMLElement | null = null;
 let runToken = 0;
 // 進行中真實拖曳的「同步非提交式中止」入口（由 realDrag 設定，cancelDemo 呼叫）。
@@ -158,9 +148,10 @@ async function typeInto(
 // ──────────────────────────────────────────────────────────
 
 /**
- * 步驟 1：選角。
- *   1) 指標移到 c1 頭像、略停 hover，直接點擊開下拉。
- *   2) 捲動找到「莫寧(Mornye)」→ 點選 → 確認換角（清空區塊）。
+ * 步驟 n1：選角與取消選角（c3 泳道）。
+ *   1) 指標移到 c3（愛彌斯）頭像、略停 hover，點擊開下拉；
+ *      捲動找到「莫寧(Mornye)」→ 點選 → 確認換角（清空區塊）。
+ *   2) 指標移到莫寧 header 的「取消選角」鈕並點擊 → 泳道回到未選角。
  */
 async function demoStep1(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
@@ -180,7 +171,7 @@ async function demoStep1(token: number): Promise<void> {
   (header.querySelector('.char-selector__trigger') as HTMLElement | null)?.click();
   await sleep(900, token);
 
-  // 找「莫寧」選項（與 c1 同屬性，開啟即在同一 tab，捲動即可）
+  // 找「莫寧」選項（與愛彌斯同屬熱熔，開啟即在同一 tab，捲動即可）
   const wantName = characterDisplayName(CHARACTER_MAP['mornye']);
   const listbox = document.querySelector('.char-selector__listbox') as HTMLElement | null;
   const findOpt = (): HTMLElement | undefined =>
@@ -213,6 +204,19 @@ async function demoStep1(token: number): Promise<void> {
     }
     confirmBtn.click();
   }
+  await sleep(1400, token);
+
+  // 2) 取消選角：右下角鈕靠 CSS :hover 浮現（合成事件無法觸發），
+  //    改以 inline opacity 強制顯示；點擊後泳道清空，鈕隨 v-if 移除。
+  const deselect = header.querySelector('.header__deselect') as HTMLElement | null;
+  if (!deselect) return;
+  deselect.style.opacity = '1';
+  const dp = await moveToEl(deselect, 800, token);
+  if (dp) {
+    await sleep(450, token);
+    clickFx(dp);
+  }
+  deselect.click(); // 換角後泳道已無區塊 → 不會跳確認框，直接回未選角
   await sleep(1400, token);
 }
 
@@ -340,9 +344,10 @@ async function realDrag(sourceEl: HTMLElement, target: Pt, token: number, hold =
 }
 
 /**
- * 步驟 2：通用模板庫。（spotlight 全程聚焦排軸板）
- *   1) 指標移到「通用」分頁並點擊（示範點擊）。
- *   2) 指標移到最後一個通用區塊（略停），真實拖曳到 c1 泳道中間。
+ * 步驟 n2：模板庫（合併原 o2 通用模板庫 + o4 角色模板；全程無 spotlight）。
+ *   前半（o2）：點「通用」分頁 → 拖最後一個通用區塊到 c1 泳道。
+ *   —— 中場略停 ——
+ *   後半（o4）：點「自訂」分頁 → 拖 c1 的「RZ」區塊回側邊欄自訂區存成角色模板。
  */
 async function demoStep2(token: number): Promise<void> {
   await sleep(650, token); // 等 reset + 切分頁渲染
@@ -360,89 +365,41 @@ async function demoStep2(token: number): Promise<void> {
   }
   await sleep(650, token);
 
-  // 2) 移到最後一個通用區塊、略停（spotlight 全程在排軸板，無需中途換焦點）
+  // 2) 移到最後一個通用區塊、略停，真實拖曳到 c1（slot 0）現有區塊中間、泳道垂直中心
   const chips = [...document.querySelectorAll<HTMLElement>('#tabpanel-general .chip-wrapper')];
   const last = chips[chips.length - 1];
-  if (!last) return;
-  await moveToEl(last, 850, token);
-  await sleep(800, token);
-
-  // 真實拖曳到 c1（slot 0）現有區塊的水平中間、泳道垂直中心
-  const laneBlocks = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')];
-  const track = document.querySelector('[data-slot-index="0"] .swimlane__track') as HTMLElement | null;
-  let target: Pt | null = null;
-  if (laneBlocks.length >= 2) {
-    const a = laneBlocks[0].getBoundingClientRect();
-    const b = laneBlocks[laneBlocks.length - 1].getBoundingClientRect();
-    target = { x: (a.left + b.right) / 2, y: (a.top + a.bottom) / 2 };
-  } else if (track) {
-    const r = track.getBoundingClientRect();
-    target = { x: r.left + r.width * 0.35, y: r.top + r.height / 2 };
+  if (last) {
+    await moveToEl(last, 850, token);
+    await sleep(800, token);
+    const laneBlocks = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')];
+    const track = document.querySelector('[data-slot-index="0"] .swimlane__track') as HTMLElement | null;
+    let target: Pt | null = null;
+    if (laneBlocks.length >= 2) {
+      const a = laneBlocks[0].getBoundingClientRect();
+      const b = laneBlocks[laneBlocks.length - 1].getBoundingClientRect();
+      target = { x: (a.left + b.right) / 2, y: (a.top + a.bottom) / 2 };
+    } else if (track) {
+      const r = track.getBoundingClientRect();
+      target = { x: r.left + r.width * 0.35, y: r.top + r.height / 2 };
+    }
+    if (target) await realDrag(last, target, token);
   }
-  if (target) await realDrag(last, target, token);
-  await sleep(1200, token);
-}
 
-/**
- * 步驟 3：新增自訂區塊。
- *   1) 指標移到 c1 泳道的「＋」新增鈕並點擊 → 真實新增空白區塊並進入行內編輯。
- *   2) 在輸入框逐字輸入「EA」，按 Enter 提交命名。
- */
-async function demoStep3(token: number): Promise<void> {
-  await sleep(800, token); // 等 reset 後版面渲染
-  showCursor();
+  // —— 中場略停，接續示範「存成角色模板」（原 o4）——
+  await sleep(1000, token);
 
-  // 1) 移到 c1 泳道的「＋」新增鈕並點擊
-  const addBtn = document.querySelector('[data-tour="add-block"]') as HTMLElement | null;
-  if (!addBtn) return;
-  const ap = centerOf(addBtn);
-  if (ap) {
-    cursorInstant(ap.x - 40, ap.y + 40);
-    await moveTo(ap.x, ap.y, 650, token);
-    await sleep(300, token);
-    clickFx(ap);
-  }
-  addBtn.click(); // 真實新增空白區塊 + 進入行內編輯（輸入框自動聚焦）
-  await sleep(550, token); // 等 nextTick 渲染輸入框並聚焦
-
-  // 2) 逐字輸入「EA」→ 按 Enter 提交
-  const input = document.querySelector('.rotation-block__input') as HTMLInputElement | null;
-  if (!input) return;
-  input.readOnly = true; // 純觀看：使用者打不進字；程式設值 + 派發 input 事件仍有效
-  const ip = centerOf(input);
-  if (ip) await moveTo(ip.x, ip.y + 20, 500, token);
-  await sleep(300, token);
-  await typeInto(input, 'EA', token);
-  await sleep(550, token);
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-  await sleep(1200, token);
-}
-
-/**
- * 步驟 4：角色模板（拖回側邊欄存成自訂模板）。
- *   1) 指標移到「自訂」分頁並點擊。[焦點：側邊欄]
- *   2) 焦點擴大到側邊欄＋排軸板；指標移到 c1 的「RZ」區塊並停留（觸發 hover）。
- *   3) 真實拖曳該區塊到側邊欄自訂區並放開 → 觸發「存成角色模板」。
- */
-async function demoStep4(token: number): Promise<void> {
-  await sleep(650, token); // 等 reset + 切分頁渲染
-  showCursor();
-
-  // 1) 點「自訂」分頁
+  // 3) 點「自訂」分頁
   const customTab = document.getElementById('tab-custom');
   const cp = customTab ? centerOf(customTab) : null;
   if (cp) {
-    cursorInstant(cp.x - 46, cp.y + 34);
-    await moveTo(cp.x, cp.y, 800, token);
+    await moveToEl(customTab, 700, token);
     await sleep(300, token);
     clickFx(cp);
     customTab!.click();
   }
   await sleep(800, token);
 
-  // 2) 焦點擴大到側邊欄＋排軸板，再移到 c1 的「RZ」區塊並停留
-  tourRefocus(token, '.app-layout');
-  await sleep(550, token);
+  // 4) 移到 c1 的「RZ」區塊並停留（觸發 hover）
   const rz = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')]
     .find((b) => b.textContent?.trim() === 'RZ');
   if (!rz) return;
@@ -450,7 +407,7 @@ async function demoStep4(token: number): Promise<void> {
   rz.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // 顯示 hover 態
   if (rp) await sleep(600, token);
 
-  // 3) 真實拖曳 RZ 到側邊欄自訂區並放開（落點在 data-sidebar-zone 內 → 存成模板）
+  // 5) 真實拖曳 RZ 到側邊欄自訂區並放開（落點在 data-sidebar-zone 內 → 存成模板）
   const panel = (document.getElementById('tabpanel-custom')
     ?? document.querySelector('.sidebar-panel')) as HTMLElement | null;
   const target = panel ? centerOf(panel) : null;
@@ -458,52 +415,98 @@ async function demoStep4(token: number): Promise<void> {
   await sleep(1000, token);
 }
 
+/** 對真實元件派發合成 keydown（isTrusted=false 可穿過導覽鍵盤攔截）。
+ *  務必派發於帶 tagName 的元件（非 window）：快捷鍵焦點守衛讀 target.tagName。 */
+function pressKey(el: HTMLElement, key: string): void {
+  el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+}
+/** 提交行內編輯：對輸入框派發 Enter。 */
+function pressEnter(el: HTMLElement): void {
+  pressKey(el, 'Enter');
+}
+/** 派發帶 Ctrl（Mac 併帶 Meta）的合成 keydown，觸發剪貼簿／歷史快捷鍵。 */
+function pressCtrl(el: HTMLElement, key: string): void {
+  el.dispatchEvent(new KeyboardEvent('keydown', {
+    key, ctrlKey: true, metaKey: true, bubbles: true, cancelable: true,
+  }));
+}
+
+/** 取得當前行內編輯輸入框並設為純觀看（使用者打不進字；程式設值 + input 事件仍有效）。 */
+function grabEditInput(): HTMLInputElement | null {
+  const input = document.querySelector('.rotation-block__input') as HTMLInputElement | null;
+  if (input) input.readOnly = true;
+  return input;
+}
+
 /**
- * 步驟 5：編輯區塊內容。
- *   1) 指標移到 c1 最後一個區塊並停留，spotlight 聚焦到該區塊。
- *   2) 雙擊進入行內編輯，略停後把文字改成「AQ」並按 Enter 提交。
+ * 步驟 n3：新增與編輯區塊（合併原 o3/o5；子步驟多，停頓一律縮短）。
+ *   1) 同 o3：點 c1 泳道「＋」→ 輸入「EA」→ Enter。
+ *   2) 指標移到 c1 第一個區塊「E」並點選。
+ *   3) 按 Space → 於選取區塊後插入空白區塊並進入編輯。
+ *   4) 輸入「AA」→ Enter（示範打錯字）。
+ *   5) 該區塊仍在選取中 → 按 Enter 重新編輯 → 改輸入「Q」→ Enter。
  */
-async function demoStep5(token: number): Promise<void> {
-  await sleep(800, token); // 等 reset 後版面渲染
+async function demoStep3(token: number): Promise<void> {
+  await sleep(600, token); // 等 reset 後版面渲染
   showCursor();
 
-  const blocks = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')];
-  const last = blocks[blocks.length - 1];
-  if (!last) return;
-  const id = last.getAttribute('data-entry-id');
-
-  // 1) 移到最後一個區塊 → 聚焦高亮該塊
-  const p = await moveToEl(last, 950, token);
-  last.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-  if (id) tourRefocus(token, `[data-entry-id="${id}"]`);
-  await sleep(1000, token);
-
-  // 2) 雙擊進入編輯（RotationBlock @dblclick → startEditing，輸入框自動聚焦全選）
-  if (p) clickFx(p);
-  last.dispatchEvent(new MouseEvent('dblclick', {
-    bubbles: true, cancelable: true, clientX: p?.x, clientY: p?.y, view: window,
-  }));
-  await sleep(800, token); // 停一會兒等輸入框出現
-
-  // 移動鼠標到label下方避免遮擋
-  const lp = last ? centerOf(last) : null;
-  if (lp) {
-    await moveTo(lp.x, lp.y + 20, 500, token);
-    await sleep(300, token);
+  // 1) 移到 c1 泳道的「＋」新增鈕並點擊 → 輸入「EA」→ Enter
+  const addBtn = document.querySelector('[data-tour="add-block"]') as HTMLElement | null;
+  if (!addBtn) return;
+  const ap = centerOf(addBtn);
+  if (ap) {
+    cursorInstant(ap.x - 40, ap.y + 40);
+    await moveTo(ap.x, ap.y, 550, token);
+    await sleep(200, token);
+    clickFx(ap);
   }
-
-  const input = document.querySelector('.rotation-block__input') as HTMLInputElement | null;
+  addBtn.click(); // 真實新增空白區塊 + 進入行內編輯（輸入框自動聚焦）
+  await sleep(450, token); // 等 nextTick 渲染輸入框並聚焦
+  let input = grabEditInput();
   if (!input) return;
-  input.readOnly = true; // 純觀看：使用者打不進字；程式設值 + 派發 input 事件仍有效
+  const ip = centerOf(input);
+  if (ip) await moveTo(ip.x, ip.y + 20, 400, token);
+  await typeInto(input, 'EA', token);
   await sleep(350, token);
-  // 進場已全選原文字；typeInto 直接改寫 value → 逐字替換為「EQ」。
-  // 每字後重畫遮罩，使 spotlight 隨區塊變寬同步擴張。
-  await typeInto(input, 'EQ', token, () => tourRefresh(token));
-  await sleep(550, token);
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-  // 提交後輸入框換回 chip，尺寸再變 → 等渲染完成後再重畫一次遮罩。
-  await sleep(120, token);
-  tourRefresh(token);
+  pressEnter(input);
+  await sleep(650, token);
+
+  // 2) 點選 c1 第一個區塊「E」
+  const eBlock = [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')]
+    .find((b) => b.textContent?.trim() === 'E');
+  if (!eBlock) return;
+  const ep = await moveToEl(eBlock, 600, token);
+  if (ep) clickFx(ep);
+  clickBlock(eBlock, ep, false);
+  await sleep(500, token);
+
+  // 3) Space：合成鍵盤事件（isTrusted=false 可穿過導覽攔截）走真實快捷鍵流程，
+  //    於選取區塊後插入空白區塊並進入行內編輯。派發於真實區塊而非 window：
+  //    快捷鍵處理器的焦點守衛讀 event.target.tagName，target=window 無 tagName 會拋錯。
+  pressKey(eBlock, ' ');
+  await sleep(450, token);
+
+  // 4) 輸入「AA」→ Enter（示範打錯字）
+  input = grabEditInput();
+  if (!input) return;
+  const np = centerOf(input);
+  if (np) await moveTo(np.x, np.y + 20, 350, token);
+  await typeInto(input, 'AA', token);
+  await sleep(300, token);
+  pressEnter(input);
+  await sleep(600, token);
+
+  // 5) 該區塊提交後仍在選取中（選取與編輯狀態獨立）→ 按 Enter 重新編輯 → 改輸入「Q」→ Enter。
+  //    Enter 派發於 document.body（有 tagName、非輸入元素），走 editSelectedLabels 重進編輯。
+  pressKey(document.body, 'Enter');
+  await sleep(400, token); // 等輸入框出現（進場已全選原文字）
+  input = grabEditInput();
+  if (!input) return;
+  const qp = centerOf(input);
+  if (qp) await moveTo(qp.x, qp.y + 20, 300, token);
+  await typeInto(input, 'Q', token);
+  await sleep(350, token);
+  pressEnter(input);
   await sleep(1000, token);
 }
 
@@ -546,14 +549,14 @@ async function marqueeSelect(a: HTMLElement, b: HTMLElement, token: number): Pro
 }
 
 /**
- * 步驟 6：多重選取。
+ * 步驟 o6：多重選取。
  *   1) 焦點在排軸板（含三泳道與下方空白）。
  *   2) 對 c2 的「E」「2A」各 Ctrl+點擊 → 累加多選。
  *   3) 移到空白處點擊 → 清除選取。
  *   4) 拉出選取框再次框選這兩塊。
  *   5) 多選拖曳到最左（連招最前）。
  */
-async function demoStep6(token: number): Promise<void> {
+async function demoStep4(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
   showCursor();
 
@@ -578,7 +581,7 @@ async function demoStep6(token: number): Promise<void> {
   if (boardScroll) {
     const ar = aBlock.getBoundingClientRect();
     const bs = boardScroll.getBoundingClientRect();
-    const blank: Pt = { x: Math.min(ar.right + 64, bs.right - 20), y: ar.top + ar.height / 2 };
+    const blank: Pt = { x: Math.min(ar.right + 10, bs.right - 60), y: ar.top + ar.height / 2 };
     await moveTo(blank.x, blank.y, 550, token);
     clickFx(blank);
     boardScroll.dispatchEvent(new MouseEvent('click', {
@@ -605,11 +608,11 @@ async function demoStep6(token: number): Promise<void> {
 }
 
 /**
- * 步驟 7：刪除區塊。
+ * 步驟 o7：刪除區塊。
  *   1) 指標移到 c3 的「AAE」區塊。[焦點：三泳道與下方空白]
  *   2) 真實拖曳到下方刪除區（略停顯示紅色警告態）後放開 → 刪除該區塊。
  */
-async function demoStep7(token: number): Promise<void> {
+async function demoStep5(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
   showCursor();
 
@@ -639,12 +642,14 @@ async function demoStep7(token: number): Promise<void> {
 }
 
 /**
- * 步驟 8：區塊巡覽（A/D 選上一個／下一個區塊）。
- *   模擬穩定節奏按 8 次 <D>，逐塊循環整條輸出軸的選取焦點。
- *   註：導覽期間 A/D 已被攔截去切步驟，故直接呼叫 App 的區塊巡覽 action，
- *       而非派發真實鍵盤事件。
+ * 步驟 n4（原 o8）：區塊與泳道巡覽。
+ *   1) 同 o8：穩定節奏按 8 次 <D>，逐塊循環整條輸出軸的選取焦點。
+ *   2) 快速按 4 次 <S>，依顯示順序逐條往下循環選取整條泳道。
+ *   3) 泳道選取中按 <Space> → 於全軸末尾新增該泳道區塊並進編輯 → 輸入「EA」→ <Enter>。
+ *   註：導覽期間 A/D／W/S 已被攔截去切步驟，故直接呼叫 App 的巡覽 action；
+ *       Space/Enter 以合成鍵盤事件（isTrusted=false）穿過攔截走真實流程。
  */
-async function demoStep8(token: number): Promise<void> {
+async function demoStep6(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
   hideCursor(); // 本步為鍵盤操作，不需虛擬指標
 
@@ -653,13 +658,145 @@ async function demoStep8(token: number): Promise<void> {
   rotationStore.clearSelection();
   await sleep(400, token);
 
-  // 穩定節奏按 8 次 D：無選取時 D 先選最左塊，其後逐塊往右循環。
+  // 1) 穩定節奏按 8 次 D：無選取時 D 先選最左塊，其後逐塊往右循環。
   for (let i = 0; i < 8; i++) {
     checkToken(token);
     nav.focusStep(1);
-    await sleep(620, token);
+    await sleep(500, token);
+  }
+  await sleep(600, token);
+
+  // 2) 按 4 次 S：依顯示順序逐條往下循環選取整條泳道。
+  for (let i = 0; i < 4; i++) {
+    checkToken(token);
+    nav.focusLaneStep(1);
+    await sleep(500, token);
+  }
+  await sleep(600, token);
+
+  // 3) Space（泳道選取中）→ 於全軸末尾新增該泳道區塊並進編輯 → 輸入「EA」→ Enter。
+  //    派發於 document.body（有 tagName、非輸入元素）以穿過快捷鍵焦點守衛。
+  pressKey(document.body, ' ');
+  await sleep(450, token); // 等 nextTick 渲染輸入框並聚焦
+  const input = grabEditInput();
+  if (!input) return;
+  await typeInto(input, 'EA', token);
+  await sleep(350, token);
+  pressEnter(input);
+  await sleep(1000, token);
+}
+
+/**
+ * 步驟 n5：剪貼簿與歷史（焦點在 c1〔長離〕泳道）。
+ *   1) 對 c1 的「E」「RZ」各 Ctrl+點擊 → 累加多選。
+ *   2) 按 Ctrl+X 剪下。
+ *   3) 指標移到全軸末尾的「A」區塊並點選。
+ *   4) 按 Ctrl+V 貼上（略停）。
+ *   5) 連按兩次 Ctrl+Z 復原。
+ *   註：Ctrl 組合以合成鍵盤事件（isTrusted=false）穿過導覽攔截走真實流程；
+ *       派發於 document.body（有 tagName、非輸入元素）以過焦點守衛。
+ */
+async function demoStep7(token: number): Promise<void> {
+  await sleep(800, token); // 等 reset 後版面渲染
+  showCursor();
+
+  const find = (label: string): HTMLElement | undefined =>
+    [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')]
+      .find((b) => b.textContent?.trim() === label);
+
+  // 1) Ctrl+點擊 E → 再 Ctrl+點擊 RZ（累加多選）
+  const eBlock = find('E');
+  const rzBlock = find('RZ');
+  if (!eBlock || !rzBlock) return;
+  let p = await moveToEl(eBlock, 800, token);
+  if (p) clickFx(p);
+  clickBlock(eBlock, p, true);
+  await sleep(500, token);
+  p = await moveToEl(rzBlock, 500, token);
+  if (p) clickFx(p);
+  clickBlock(rzBlock, p, true);
+  await sleep(650, token);
+
+  // 2) Ctrl+X 剪下
+  pressCtrl(document.body, 'x');
+  await sleep(800, token);
+
+  // 3) 指標移到全軸末尾的「A」區塊並點選（單選取代原選取）
+  const aBlock = find('A');
+  if (!aBlock) return;
+  p = await moveToEl(aBlock, 700, token);
+  if (p) clickFx(p);
+  clickBlock(aBlock, p, false);
+  await sleep(550, token);
+
+  // 4) Ctrl+V 貼上（於選取區塊後插入剪下的區塊），略停
+  pressCtrl(document.body, 'v');
+  await sleep(1100, token);
+
+  // 5) 連按兩次 Ctrl+Z 復原
+  for (let i = 0; i < 2; i++) {
+    checkToken(token);
+    pressCtrl(document.body, 'z');
+    await sleep(700, token);
   }
   await sleep(1000, token);
+}
+
+/**
+ * 步驟 n6：調整角色順序（泳道垂直拖曳重排）。
+ *   1) 指標移到 c1（長離）泳道 header 的拖曳把手並略停。
+ *   2) 垂直拖曳整條泳道到第三位（最下方）後放開 → laneOrder 更新、平滑滑入。
+ *   註：泳道重排靠把手 mousedown + window mousemove/mouseup 座標驅動（不經 SortableJS、
+ *       不用 elementFromPoint），故直接派發合成滑鼠事件即可，無需關遮罩。
+ */
+async function demoStep8(token: number): Promise<void> {
+  await sleep(800, token); // 等 reset 後版面渲染
+  showCursor();
+
+  const handle = document.querySelector('[data-slot-index="0"] .header__drag-handle') as HTMLElement | null;
+  const lane2 = document.querySelector('.swimlane[data-slot-index="2"]') as HTMLElement | null;
+  if (!handle || !lane2) return;
+
+  // 1) 移到拖曳把手並略停
+  const hp = await moveToEl(handle, 850, token);
+  if (!hp) return;
+  await sleep(600, token);
+  clickFx(hp);
+
+  // 「只要按下過就一定放開」：中途切步驟/Esc 時，useLaneReorder 仍掛著 window
+  // mouseup 監聽等待放開；若不補送 mouseup，浮動分身會黏在使用者真實滑鼠上、
+  // laneDrag 狀態也不還原。以 release 保證放開（idempotent），並註冊給 cancelDemo。
+  let downFired = false;
+  let upFired = false;
+  const release = (x: number, y: number): void => {
+    if (!downFired || upFired) return;
+    upFired = true;
+    window.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true, view: window, button: 0, clientX: x, clientY: y,
+    }));
+    abortDrag = null;
+  };
+  // 供 cancelDemo 於切步驟/Esc 時「同步」結束泳道拖曳（放開後 laneOrder 交由
+  // resetDemoBoard/restore 還原，故落點無妨，只需確保拖曳確實結束）。
+  abortDrag = () => release(-99999, -99999);
+  try {
+    // 2) mousedown 於把手起拖 → window mousemove 逐幀往下越過最後泳道中點 → mouseup 落到第三位
+    handle.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, view: window, button: 0, clientX: hp.x, clientY: hp.y,
+    }));
+    downFired = true;
+    const lr = lane2.getBoundingClientRect();
+    const target: Pt = { x: hp.x, y: lr.top + lr.height * 0.75 };
+    await animateCursor(hp, target, 950, token, (x, y) => {
+      window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, view: window, clientX: x, clientY: y }));
+    });
+    await sleep(300, token);
+    release(target.x, target.y);
+    await sleep(1200, token);
+  } catch (e) {
+    release(-99999, -99999); // 被取消（CancelledError）→ 同步放開，收拾拖曳
+    throw e;
+  }
 }
 
 const DEMOS: Record<number, (token: number) => Promise<void>> = {

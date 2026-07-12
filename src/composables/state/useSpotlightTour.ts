@@ -101,7 +101,7 @@ interface BoardSnapshot {
 }
 let snapshot: BoardSnapshot | null = null;
 /** 示範版面基準（供每次示範動畫重設，確保可重複播放）。 */
-let demoBaseline: { slots: CharacterSlots; axis: RotationAxis } | null = null;
+let demoBaseline: { slots: CharacterSlots; axis: RotationAxis; laneOrder: SlotIndex[] } | null = null;
 
 /** 示範隊伍三角色（依畫面上→下對應泳道 0/1/2）。 */
 const DEMO_CHAR_IDS: [string, string, string] = ['changli', 'chisaki', 'amis'];
@@ -165,7 +165,7 @@ function injectDemo(): void {
   };
 
   const { slots, axis } = buildDemo();
-  demoBaseline = { slots: deepClone(slots), axis: deepClone(axis) };
+  demoBaseline = { slots: deepClone(slots), axis: deepClone(axis), laneOrder: [0, 1, 2] };
   characterStore.slots = slots;
   rotationStore.axes = [axis];
   rotationStore.activeAxisId = axis.id;
@@ -178,15 +178,22 @@ function resetDemoBoard(): void {
   const rotationStore = useRotationStore();
   const characterStore = useCharacterStore();
   const templateStore = useTemplateStore();
+  const { laneOrder } = useLaneOrder();
 
   characterStore.slots = deepClone(demoBaseline.slots);
   rotationStore.axes = [deepClone(demoBaseline.axis)];
   rotationStore.activeAxisId = rotationStore.axes[0].id;
+  // 泳道順序也重設回基準：否則 n6 拖曳重排後的順序會殘留到後續步驟。
+  laneOrder.value = deepClone(demoBaseline.laneOrder);
   // 示範期間模板庫清空：避免使用者既有同名模板使「存模板」被去重略過，
   // 也讓示範新增的 chip 一定是清單裡唯一/最後一個。結束時 restore 還原。
   templateStore.templates = [];
   rotationStore.clearSelection();
   rotationStore.stopEditing();
+  // 側邊欄一律保持展開（步驟 2/4 需要）：避免任何步驟殘留的收合狀態影響後續步驟。
+  useSidebarCollapse().collapsed.value = false;
+  // 側邊欄分頁重設回預設「通用」：避免 n2 切到「自訂」的分頁殘留到後續步驟。
+  clickTab('tab-general');
 }
 
 /** 還原導覽開始前的版面。 */
@@ -210,7 +217,7 @@ function restore(): void {
   demoBaseline = null;
 }
 
-/** 切換側邊欄分頁（步驟 2/5 進場時呼叫）。 */
+/** 切換側邊欄分頁（步驟 2/4 進場時呼叫）。 */
 function clickTab(id: 'tab-general' | 'tab-custom'): void {
   (document.getElementById(id) as HTMLElement | null)?.click();
 }
@@ -258,23 +265,27 @@ function buildSteps(): DriveStep[] {
   // 每一步進場（onHighlighted）都先把示範版面載入為截圖基準狀態，
   // 之後再疊加該步的「真實互動效果」動畫（依步驟逐一建置）。
   return [
-    { ...step(1, '[data-tour="lane-header"]', 'right'), onHighlighted: () => { resetDemoBoard(); runDemo(1); } },
+    // n1：選角/取消選角（c3 泳道 header；氣泡放頭像右上，避免被任何語言的角色選單遮擋）。
+    { ...step(1, '[data-tour="lane-header"]', 'top'), onHighlighted: () => { resetDemoBoard(); runDemo(1); } },
+    // n2：模板庫（合併原 o2 通用模板庫 + o4 角色模板；全程不聚焦、以 .app-layout 當「無 spotlight」）。
     {
       ...step(2, '.app-layout', 'top', 'center'),
       onHighlightStarted: () => clickTab('tab-general'),
       onHighlighted: () => { resetDemoBoard(); runDemo(2); },
     },
+    // n3：新增與編輯區塊（合併原 o3/o5）。
     { ...step(3, '[data-slot-index="0"]', 'left', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(3); } },
-    {
-      ...step(4, '.sidebar-panel', 'right', 'center'),
-      // 進場停在「通用」頁；切到「自訂」由 demo 內點擊分頁的動作負責。
-      onHighlightStarted: () => clickTab('tab-general'),
-      onHighlighted: () => { resetDemoBoard(); runDemo(4); },
-    },
-    { ...step(5, '[data-slot-index="0"]', 'left', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(5); } },
+    // o6（新編號 4）：多重選取。
+    { ...step(4, '.board__lanes', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(4); } },
+    // o7（新編號 5）：刪除區塊。
+    { ...step(5, '.rotation-board', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(5); } },
+    // n4（編號 6）：區塊巡覽。
     { ...step(6, '.board__lanes', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(6); } },
+    // n5（編號 7）：剪貼簿與歷史（highlight 用尺寸穩定的 .rotation-board，避免
+    //   貼上新增欄位使 .board__lanes 變寬時 spotlight 框跟著位移）。
     { ...step(7, '.rotation-board', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(7); } },
-    { ...step(8, '.board__lanes', 'top', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(8); } },
+    // n6（編號 8）：調整角色順序（拖曳泳道重排）。
+    { ...step(8, '.board__lanes', 'right', 'center'), onHighlighted: () => { resetDemoBoard(); runDemo(8); } },
     step(9, '.axis-tabbar', 'top', 'center'),
     // ── 收尾三步（固定掛最末端；未來新步驟插在本行之前）──
     namedStep('Teams', '[data-tour="teams"]', 'bottom', 'end'),
@@ -325,6 +336,14 @@ function onTourKeydown(event: KeyboardEvent): void {
   if (!isActive.value || !driverObj) return;
   // demo 自己派發的合成鍵盤事件（isTrusted=false，如 step3/5 的 Enter 提交）放行。
   if (!event.isTrusted) return;
+  // 焦點在示範的行內編輯框（如 n3 新增/編輯區塊）時，吞掉所有實體按鍵：
+  // 使用者既不能打字污染示範文字，A/D 也不會被當成文字輸入或誤觸切步驟。
+  const target = event.target as HTMLElement | null;
+  const tag = target?.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) {
+    if (event.key !== 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); }
+    return;
+  }
   const key = event.key.toLowerCase();
   if (key === 'd') {
     event.preventDefault();

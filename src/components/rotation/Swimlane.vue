@@ -338,7 +338,7 @@ async function handleDeselectCharacter(): Promise<void> {
       class="swimlane__header"
       :class="{ 'swimlane__header--drag-inert': dragState.isDragging }"
       :style="{ '--lane-color': laneColor }"
-      :data-tour="slotIndex === 0 ? 'lane-header' : undefined"
+      :data-tour="slotIndex === 2 ? 'lane-header' : undefined"
       aria-hidden="false"
     >
       <!-- 左側垂直色條：屬性色識別（未選角為灰）。 -->
