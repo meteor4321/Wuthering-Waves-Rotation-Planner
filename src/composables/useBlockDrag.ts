@@ -25,6 +25,7 @@ import {
   DROP_ZONE_ATTRIBUTE,
   DELETE_ZONE_ATTRIBUTE,
   SIDEBAR_ZONE_ATTRIBUTE,
+  NEUTRAL_ZONE_ATTRIBUTE,
   DELETE_ZONE_BODY_CLASS,
   FORBIDDEN_BODY_CLASS,
   SIDEBAR_ZONE_BODY_CLASS,
@@ -36,7 +37,7 @@ import { commitDrop } from '@/composables/blockDrag/commit';
 import { prefersReducedMotion } from '@/utils/reducedMotion';
 
 // 呼叫端沿用本模組的匯出（Swimlane/RotationBoard/SidebarPanel 等），原樣轉出。
-export { DROP_ZONE_ATTRIBUTE, DELETE_ZONE_ATTRIBUTE, SIDEBAR_ZONE_ATTRIBUTE };
+export { DROP_ZONE_ATTRIBUTE, DELETE_ZONE_ATTRIBUTE, SIDEBAR_ZONE_ATTRIBUTE, NEUTRAL_ZONE_ATTRIBUTE };
 export type { SortableEventLike };
 
 // 拖曳中最後一次游標座標（視窗座標）。供 notifyAutoScroll 在「游標靜止、內容自動捲動」時，
@@ -77,7 +78,11 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
   document.body.classList.remove(SIDEBAR_ZONE_BODY_CLASS);
 
   const overValid = !!target?.closest(`[${DROP_ZONE_ATTRIBUTE}]`);
-  const overDeleteZone = !overValid && !!target?.closest(`[${DELETE_ZONE_ATTRIBUTE}]`);
+  // 中立區（泳道尾端留白佔位）優先於刪除區：它位於主軸面板（刪除區）內，
+  // 若不先排除會被 closest 誤判為可刪除 → 拖到留白鬆手誤刪。中立區＝禁止放置（彈回）。
+  const overNeutral = !overValid && !!target?.closest(`[${NEUTRAL_ZONE_ATTRIBUTE}]`);
+  const overDeleteZone =
+    !overValid && !overNeutral && !!target?.closest(`[${DELETE_ZONE_ATTRIBUTE}]`);
   const overForbidden = !overValid && !overDeleteZone;
 
   _dragState.isOverInvalidZone = !overValid;

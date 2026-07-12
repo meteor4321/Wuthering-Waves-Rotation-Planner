@@ -26,7 +26,7 @@ import { useEdgeAutoScroll } from '@/composables/board/useEdgeAutoScroll'
 import { useMarquee } from '@/composables/board/useMarquee'
 import { useLaneReorder } from '@/composables/board/useLaneReorder'
 import { useHistory } from '@/composables/state/useHistory'
-import { DELETE_ZONE_ATTRIBUTE, useBlockDrag } from '@/composables/useBlockDrag'
+import { DELETE_ZONE_ATTRIBUTE, NEUTRAL_ZONE_ATTRIBUTE, useBlockDrag } from '@/composables/useBlockDrag'
 import { getElementColor } from '@/constants/elements'
 import { useSettings } from '@/composables/state/useSettings'
 import { prefersReducedMotion } from '@/utils/reducedMotion'
@@ -341,23 +341,29 @@ onMounted(() => {
     :aria-label="$t('board.panelLabel')"
   >
     <div ref="boardScrollRef" class="board__scroll">
-      <!-- 泳道依 orderedSlots（laneOrder）排列；TransitionGroup 讓放開後的
-           重排平滑滑動（move 過渡）。key 用 slotIndex（與 entries/欄位無關）。 -->
-      <TransitionGroup tag="div" class="board__lanes" name="lane">
-        <Swimlane
-          v-for="slot in orderedSlots"
-          :key="slot.slotIndex"
-          :slot-index="slot.slotIndex"
-          :character="slot.character"
-          :entries="entriesBySlot[slot.slotIndex]"
-          :grid-template="previewGridTemplate"
-          :id-to-column-index="previewIdToColumn"
-          :placeholder-column="previewLayout.placeholderColumn"
-          :preview-slot-index="previewLayout.slotIndex"
-          :dragging-as-source="laneDrag.active && laneDrag.slotIndex === slot.slotIndex"
-          @lane-drag-start="onLaneDragStart"
-        />
-      </TransitionGroup>
+      <!-- 橫向內容列：泳道群 + 尾端留白佔位（讓末端區塊可捲至畫面中央）。 -->
+      <div class="board__content">
+        <!-- 泳道依 orderedSlots（laneOrder）排列；TransitionGroup 讓放開後的
+             重排平滑滑動（move 過渡）。key 用 slotIndex（與 entries/欄位無關）。 -->
+        <TransitionGroup tag="div" class="board__lanes" name="lane">
+          <Swimlane
+            v-for="slot in orderedSlots"
+            :key="slot.slotIndex"
+            :slot-index="slot.slotIndex"
+            :character="slot.character"
+            :entries="entriesBySlot[slot.slotIndex]"
+            :grid-template="previewGridTemplate"
+            :id-to-column-index="previewIdToColumn"
+            :placeholder-column="previewLayout.placeholderColumn"
+            :preview-slot-index="previewLayout.slotIndex"
+            :dragging-as-source="laneDrag.active && laneDrag.slotIndex === slot.slotIndex"
+            @lane-drag-start="onLaneDragStart"
+          />
+        </TransitionGroup>
+
+        <!-- 尾端留白佔位：純佔位、不可互動（中立區＝拖曳鬆手一律彈回，非落點非刪除區）。 -->
+        <div class="board__end-spacer" :[NEUTRAL_ZONE_ATTRIBUTE]="true" aria-hidden="true" />
+      </div>
     </div>
 
     <!-- 泳道拖曳浮起分身：橫向滿版的帶狀，跟游標垂直移動 -->
@@ -436,16 +442,36 @@ onMounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
+  /* 宣告為容器查詢容器：讓尾端留白與泳道最小寬能以 cqw（可視寬度）定尺寸，
+     捲動內容再寬，cqw 仍以「可視視窗寬」為基準（scrollWidth 不影響）。 */
+  container-type: inline-size;
+}
+
+/* 橫向內容列：泳道群（撐滿可視寬、可再被內容撐寬）＋ 尾端留白佔位。 */
+.board__content {
+  display: flex;
+  flex-direction: row;
+  width: max-content;
+  height: fit-content;
 }
 
 .board__lanes {
   display: flex;
   flex-direction: column;
   width: max-content;
-  min-width: 100%;
+  /* 至少填滿可視寬度（原 min-width:100%；改 cqw 因外層多包一層 flex，
+     100% 會含尾端留白而失真）。內容超出時仍由 max-content 撐寬。 */
+  min-width: 100cqw;
   /* 高度自適應（泳道為固定高、不依賴父高）：使本容器剛好包住三泳道，
      下方空白改由 .board__scroll 承載。導覽 step6/8 即以此元素精準聚焦三泳道。 */
   height: fit-content;
+}
+
+/* 尾端留白佔位：恆佔可視寬的一半，讓最末區塊能捲到畫面中央。
+   純佔位、不可互動：掛 data-neutral-zone（拖曳鬆手一律彈回，非落點非刪除區），
+   無任何視覺（透明），高度隨 flex stretch 貼齊三泳道帶。 */
+.board__end-spacer {
+  flex: 0 0 50cqw;
 }
 
 /* 泳道拖曳進行中：整個面板游標呈抓取態 */

@@ -16,6 +16,9 @@ export const DROP_ZONE_ATTRIBUTE = 'data-drop-zone';
 export const DELETE_ZONE_ATTRIBUTE = 'data-delete-zone';
 // 側邊欄序列化區（自訂模板面板）。主軸區塊拖到此處放開 → 序列化為角色模板。
 export const SIDEBAR_ZONE_ATTRIBUTE = 'data-sidebar-zone';
+// 拖曳中立區（泳道尾端留白佔位）：不是落點也不是刪除區，鬆手一律彈回原位。
+// 判定優先序高於刪除區（該留白位於主軸面板內，否則會被 closest 誤判為可刪除區）。
+export const NEUTRAL_ZONE_ATTRIBUTE = 'data-neutral-zone';
 
 // ── <body> 全域 class（forceFallback 浮動克隆拿不到 Vue 響應式，
 //    警告樣式改用 body class + CSS 直接套在克隆上）──────────────
