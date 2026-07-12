@@ -165,6 +165,17 @@
     "avatar": "/assets/characters/lucilla.webp"
   },
   {
+    "id": "suisui",
+    "nameZh": "穗穗",
+    "element": "冷凝",
+    "rarity": 5,
+    "nameZhCn": "穗穗",
+    "nameEn": "Suisui",
+    "nameJa": "穂穂",
+    "nameKo": "수수",
+    "avatar": "/assets/characters/suisui.webp"
+  },
+  {
     "id": "sanhua",
     "nameZh": "散華",
     "element": "冷凝",
@@ -251,6 +262,17 @@
     "nameJa": "レベッカ",
     "nameKo": "레베카",
     "avatar": "/assets/characters/rebecca.webp"
+  },
+  {
+    "id": "rover-electro",
+    "nameZh": "漂泊者·導電",
+    "element": "導電",
+    "rarity": 5,
+    "nameZhCn": "漂泊者·导电",
+    "nameEn": "Rover: Electro",
+    "nameJa": "漂泊者・電導",
+    "nameKo": "방랑자 · 전도",
+    "avatar": "/assets/characters/rover-electro.webp"
   },
   {
     "id": "yuanwu",
@@ -350,6 +372,17 @@
     "nameJa": "フローヴァ",
     "nameKo": "플로로",
     "avatar": "/assets/characters/phrolova.webp"
+  },
+  {
+    "id": "yangyang-xuanling",
+    "nameZh": "秧秧·玄翎",
+    "element": "湮滅",
+    "rarity": 5,
+    "nameZhCn": "秧秧·玄翎",
+    "nameEn": "Yangyang: Xuanling",
+    "nameJa": "秧秧・玄翎",
+    "nameKo": "양양 · 현령",
+    "avatar": "/assets/characters/yangyang-xuanling.webp"
   },
   {
     "id": "taoqi",
