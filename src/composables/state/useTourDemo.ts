@@ -91,6 +91,14 @@ async function moveTo(x: number, y: number, dur: number, token: number): Promise
   await sleep(dur, token);
 }
 
+/** 指標「出場」：先瞬移到 p 左下偏移處再顯示、滑入 p。切步驟時舊指標已被
+ *  cancelDemo 隱藏，出場前不 showCursor，避免殘留上一步位置的指標。 */
+async function cursorEnter(p: Pt, dur: number, token: number): Promise<void> {
+  cursorInstant(p.x - 40, p.y + 34);
+  showCursor();
+  await moveTo(p.x, p.y, dur, token);
+}
+
 async function moveToEl(target: string | Element | null, dur: number, token: number): Promise<Pt | null> {
   const p = centerOf(target);
   if (!p) return null;
@@ -124,21 +132,16 @@ async function scrollListboxTo(container: HTMLElement, target: HTMLElement, toke
   }
 }
 
-/** 逐字輸入到行內編輯框：每字設 value 並派發 input 事件（驅動 Vue v-model 與寬度重算）。
- *  onChange 於每字輸入後呼叫（供同步重畫 spotlight 遮罩，區塊變寬時遮罩才跟上）。 */
-async function typeInto(
-  input: HTMLInputElement,
-  text: string,
-  token: number,
-  onChange?: () => void,
-): Promise<void> {
+/** 逐字輸入到行內編輯框：每字設 value 並派發 input 事件（驅動 Vue v-model 與寬度重算），
+ *  隨後重畫 spotlight 遮罩（區塊變寬時遮罩才跟上）。 */
+async function typeInto(input: HTMLInputElement, text: string, token: number): Promise<void> {
   input.focus();
   for (let i = 1; i <= text.length; i++) {
     checkToken(token);
     input.value = text.slice(0, i);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await sleep(60, token); // 等 Vue 依草稿重算欄寬渲染，再重畫遮罩
-    onChange?.();
+    tourApi?.refresh();
     await sleep(110, token);
   }
 }
@@ -157,14 +160,12 @@ async function demoStep1(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
   const header = document.querySelector('[data-tour="lane-header"]') as HTMLElement | null;
   if (!header) return;
-  showCursor();
 
   // 1) 指標移到頭像、略停 hover，直接點擊開下拉
   const frame = header.querySelector('.header__portrait-frame');
   const ap = frame ? centerOf(frame) : null;
   if (ap) {
-    cursorInstant(ap.x - 38, ap.y + 30);
-    await moveTo(ap.x, ap.y, 800, token);
+    await cursorEnter(ap, 800, token);
     await sleep(650, token); // 略停 hover
     clickFx(ap);
   }
@@ -351,14 +352,12 @@ async function realDrag(sourceEl: HTMLElement, target: Pt, token: number, hold =
  */
 async function demoStep2(token: number): Promise<void> {
   await sleep(650, token); // 等 reset + 切分頁渲染
-  showCursor();
 
   // 1) 點「通用」分頁
   const genTab = document.getElementById('tab-general');
   const gp = genTab ? centerOf(genTab) : null;
   if (gp) {
-    cursorInstant(gp.x - 46, gp.y + 34);
-    await moveTo(gp.x, gp.y, 600, token);
+    await cursorEnter(gp, 600, token);
     await sleep(300, token);
     clickFx(gp);
     genTab!.click();
@@ -448,15 +447,13 @@ function grabEditInput(): HTMLInputElement | null {
  */
 async function demoStep3(token: number): Promise<void> {
   await sleep(600, token); // 等 reset 後版面渲染
-  showCursor();
 
   // 1) 移到 c1 泳道的「＋」新增鈕並點擊 → 輸入「EA」→ Enter
   const addBtn = document.querySelector('[data-tour="add-block"]') as HTMLElement | null;
   if (!addBtn) return;
   const ap = centerOf(addBtn);
   if (ap) {
-    cursorInstant(ap.x - 40, ap.y + 40);
-    await moveTo(ap.x, ap.y, 550, token);
+    await cursorEnter(ap, 550, token);
     await sleep(200, token);
     clickFx(ap);
   }
@@ -558,7 +555,6 @@ async function marqueeSelect(a: HTMLElement, b: HTMLElement, token: number): Pro
  */
 async function demoStep4(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
-  showCursor();
 
   const c2 = [...document.querySelectorAll<HTMLElement>('[data-slot-index="1"] .rotation-block')];
   const eBlock = c2.find((b) => b.textContent?.trim() === 'E');
@@ -566,7 +562,8 @@ async function demoStep4(token: number): Promise<void> {
   if (!eBlock || !aBlock) return;
 
   // 2) Ctrl+點擊 E → 再 Ctrl+點擊 2A（累加多選）
-  let p = await moveToEl(eBlock, 800, token);
+  let p = centerOf(eBlock);
+  if (p) await cursorEnter(p, 800, token);
   if (p) clickFx(p);
   clickBlock(eBlock, p, true);
   await sleep(550, token);
@@ -614,14 +611,14 @@ async function demoStep4(token: number): Promise<void> {
  */
 async function demoStep5(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
-  showCursor();
 
   const aae = [...document.querySelectorAll<HTMLElement>('[data-slot-index="2"] .rotation-block')]
     .find((b) => b.textContent?.trim() === 'AAE');
   if (!aae) return;
 
   // 1) 移到 AAE 並停留
-  const p = await moveToEl(aae, 850, token);
+  const p = centerOf(aae);
+  if (p) await cursorEnter(p, 850, token);
   aae.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
   if (p) await sleep(700, token);
 
@@ -698,7 +695,6 @@ async function demoStep6(token: number): Promise<void> {
  */
 async function demoStep7(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
-  showCursor();
 
   const find = (label: string): HTMLElement | undefined =>
     [...document.querySelectorAll<HTMLElement>('[data-slot-index="0"] .rotation-block')]
@@ -708,7 +704,8 @@ async function demoStep7(token: number): Promise<void> {
   const eBlock = find('E');
   const rzBlock = find('RZ');
   if (!eBlock || !rzBlock) return;
-  let p = await moveToEl(eBlock, 800, token);
+  let p = centerOf(eBlock);
+  if (p) await cursorEnter(p, 800, token);
   if (p) clickFx(p);
   clickBlock(eBlock, p, true);
   await sleep(500, token);
@@ -751,15 +748,15 @@ async function demoStep7(token: number): Promise<void> {
  */
 async function demoStep8(token: number): Promise<void> {
   await sleep(800, token); // 等 reset 後版面渲染
-  showCursor();
 
   const handle = document.querySelector('[data-slot-index="0"] .header__drag-handle') as HTMLElement | null;
   const lane2 = document.querySelector('.swimlane[data-slot-index="2"]') as HTMLElement | null;
   if (!handle || !lane2) return;
 
   // 1) 移到拖曳把手並略停
-  const hp = await moveToEl(handle, 850, token);
+  const hp = centerOf(handle);
   if (!hp) return;
+  await cursorEnter(hp, 850, token);
   await sleep(600, token);
   clickFx(hp);
 
@@ -816,7 +813,7 @@ export function runDemo(step: number): void {
   const demo = DEMOS[step];
   if (!demo) return;
   const token = ++runToken;
-  showCursor();
+  // 不在此 showCursor：舊指標剛被 cancelDemo 淡出，各步驟以 cursorEnter 於定位後現身。
   Promise.resolve()
     .then(() => demo(token))
     .catch((e) => {

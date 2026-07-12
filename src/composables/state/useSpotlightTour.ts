@@ -331,39 +331,29 @@ function stopStageRing(): void {
   stageRing = null;
 }
 
-/** capture-phase 鍵盤攔截：A/D 導覽上一步/下一步；其餘實體按鍵一律攔下（純觀看）。 */
+/** capture-phase 鍵盤攔截：A/D 導覽上一步/下一步（不論焦點，含示範輸入框）；
+ *  其餘實體按鍵一律攔下（純觀看，避免在 n3/n5 的輸入框打字、Delete、Ctrl+Z 等污染版面）。 */
 function onTourKeydown(event: KeyboardEvent): void {
   if (!isActive.value || !driverObj) return;
   // demo 自己派發的合成鍵盤事件（isTrusted=false，如 step3/5 的 Enter 提交）放行。
   if (!event.isTrusted) return;
-  // 焦點在示範的行內編輯框（如 n3 新增/編輯區塊）時，吞掉所有實體按鍵：
-  // 使用者既不能打字污染示範文字，A/D 也不會被當成文字輸入或誤觸切步驟。
-  const target = event.target as HTMLElement | null;
-  const tag = target?.tagName?.toLowerCase();
-  if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) {
-    if (event.key !== 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); }
-    return;
-  }
-  const key = event.key.toLowerCase();
-  if (key === 'd') {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    driverObj.moveNext();
-    return;
-  }
-  if (key === 'a') {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    // 第一步再往前會被 driver 視為關閉導覽 → 首步時忽略「上一步」。
-    if ((driverObj.getActiveIndex() ?? 0) > 0) driverObj.movePrevious();
-    return;
-  }
   // ESC 交給 driver 處理關閉，不攔。
   if (event.key === 'Escape') return;
-  // 其餘實體按鍵一律攔截：導覽為純觀看，避免污染示範版面
-  // （在 step3/5 的輸入框打字、Delete 刪除、Ctrl+Z/A/C/V、Tab 收合側邊欄等）。
   event.preventDefault();
   event.stopImmediatePropagation();
+  const key = event.key.toLowerCase();
+  if (key === 'd') driverObj.moveNext();
+  // 第一步再往前會被 driver 視為關閉導覽 → 首步時忽略「上一步」。
+  else if (key === 'a' && (driverObj.getActiveIndex() ?? 0) > 0) driverObj.movePrevious();
+}
+
+/** 導覽期間任何輸入框一聚焦立即設唯讀：堵住示範輸入框出現到 readOnly 補設前的空窗，
+ *  連 IME 組字（insertCompositionText 不可取消、繞過 keydown preventDefault）也進不了字；
+ *  demo 以程式設 value + 派發 input 事件驅動，不受 readOnly 影響。 */
+function onTourFocusIn(event: FocusEvent): void {
+  if (!isActive.value) return;
+  const t = event.target;
+  if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) t.readOnly = true;
 }
 
 /** capture-phase 攔掉導覽期間的實體輸入類事件（貼上/輸入/剪下/拖放），防止污染示範版面。 */
@@ -379,6 +369,7 @@ const TOUR_BLOCK_EVENTS = ['paste', 'beforeinput', 'cut', 'drop'];
 /** driver 於完成/關閉/Esc 統一呼叫：卸監聽、取消示範、還原版面、收尾。 */
 function handleDestroyed(): void {
   window.removeEventListener('keydown', onTourKeydown, true);
+  window.removeEventListener('focusin', onTourFocusIn, true);
   TOUR_BLOCK_EVENTS.forEach((e) => window.removeEventListener(e, onTourBlockInput, true));
   document.body.classList.remove('tour-active');
   stopStageRing();
@@ -449,6 +440,7 @@ export function useSpotlightTour() {
     // 提供 demo 中途移動 spotlight 焦點、重算遮罩的能力（如步驟 2/5）。
     setTourApi({ refocus, refresh: () => driverObj?.refresh() });
     window.addEventListener('keydown', onTourKeydown, true);
+    window.addEventListener('focusin', onTourFocusIn, true);
     TOUR_BLOCK_EVENTS.forEach((e) => window.addEventListener(e, onTourBlockInput, true));
     // 等示範資料渲染出泳道/區塊元件後再啟動定位。
     nextTick(() => driverObj?.drive());
