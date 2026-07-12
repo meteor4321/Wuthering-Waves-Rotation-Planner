@@ -51,9 +51,12 @@ export function commitDrop(snap: DropSnapshot): void {
       if (isMulti) rotationStore.moveBlocks(draggingIds, afterIn);
       else rotationStore.moveBlock(draggingId, afterIn);
     } else if (isOverDeleteZone) {
-      // 無合法落點且在可刪除區 → 刪除（多選刪整組）；禁止放置區一律彈回不刪
-      if (isMulti) draggingIds.forEach((id) => rotationStore.deleteBlock(id));
-      else rotationStore.deleteBlock(draggingId);
+      // 無合法落點且在可刪除區 → 即時整組刪除（一次 history）；禁止放置區一律彈回不刪。
+      // 消失淡出動畫由 useBlockDrag 的浮動分身克隆（delete-ghost）呈現，不在泳道播。
+      // ⚠ 此刪除分支的觸發條件（rotation-instance ＋ !isOverSidebar ＋ afterIn===null
+      //   ＋ isOverDeleteZone）與 useBlockDrag.handleDragEnd 的 isDeleteDrop 判斷是一體兩面，
+      //   任一邊改條件都要同步另一邊，否則動畫與實際刪除脫鉤。
+      rotationStore.deleteBlocks(isMulti ? draggingIds : [draggingId]);
     }
     return;
   }

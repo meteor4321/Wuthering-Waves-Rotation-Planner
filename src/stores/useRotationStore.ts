@@ -300,6 +300,20 @@ export const useRotationStore = defineStore('rotation', () => {
     editingDraftDirty.value = false;
   }
 
+  /** 播放消失動畫後移除一組區塊（reduce 則即刪）；不含 history/選取處理，供各刪除入口共用。 */
+  function animateThenRemove(idsToDelete: string[]): void {
+    if (idsToDelete.length === 0) return;
+    if (prefersReducedMotion()) {
+      entries.value = removeEntriesByIds(entries.value, idsToDelete);
+      return;
+    }
+    idsToDelete.forEach((id) => leavingIds.value.add(id));
+    setTimeout(() => {
+      entries.value = removeEntriesByIds(entries.value, idsToDelete);
+      idsToDelete.forEach((id) => leavingIds.value.delete(id));
+    }, LEAVE_MS);
+  }
+
   /** 批量刪除選中區塊：先標記 leavingIds 播動畫，LEAVE_MS 後移除（reduce 則即刪）。 */
   function deleteSelectedBlocks(): void {
     const idsToDelete = [...selectedIds.value];
@@ -307,17 +321,19 @@ export const useRotationStore = defineStore('rotation', () => {
     history.record();
     // 立即清除選取，讓區塊在消失動畫期間呈現未選取樣式
     selectedIds.value.clear();
+    animateThenRemove(idsToDelete);
+  }
 
-    if (prefersReducedMotion()) {
-      entries.value = removeEntriesByIds(entries.value, idsToDelete);
-      return;
-    }
-
-    idsToDelete.forEach((id) => leavingIds.value.add(id));
-    setTimeout(() => {
-      entries.value = removeEntriesByIds(entries.value, idsToDelete);
-      idsToDelete.forEach((id) => leavingIds.value.delete(id));
-    }, LEAVE_MS);
+  /** 拖曳落入刪除區的落地入口：記錄一次歷史後「即時」整組移除（單顆/多選共用）。
+   *  刻意不走 animateThenRemove：拖曳期間原區塊已隱藏、欄位已自預覽版面排除，
+   *  若延遲移除會讓欄寬先彈開再收合（閃爍）；消失淡出改由浮動分身克隆呈現
+   *  （useBlockDrag 的 delete-ghost）。 */
+  function deleteBlocks(ids: string[]): void {
+    const idsToDelete = ids.filter((id) => entries.value.some((e) => e.id === id));
+    if (idsToDelete.length === 0) return;
+    history.record();
+    idsToDelete.forEach((id) => selectedIds.value.delete(id));
+    entries.value = removeEntriesByIds(entries.value, idsToDelete);
   }
 
   /** isLeaving：該區塊是否正在播放刪除消失動畫。 */
@@ -434,6 +450,7 @@ export const useRotationStore = defineStore('rotation', () => {
     moveBlocks,
     deleteBlock,
     deleteSelectedBlocks,
+    deleteBlocks,
     isLeaving,
     selectBlock,
     selectBlocks,

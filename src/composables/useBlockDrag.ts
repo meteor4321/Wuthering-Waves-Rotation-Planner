@@ -33,6 +33,7 @@ import {
 } from '@/composables/blockDrag/state';
 import { resolveAfterIndex, clearHysteresis } from '@/composables/blockDrag/resolver';
 import { commitDrop } from '@/composables/blockDrag/commit';
+import { prefersReducedMotion } from '@/utils/reducedMotion';
 
 // 呼叫端沿用本模組的匯出（Swimlane/RotationBoard/SidebarPanel 等），原樣轉出。
 export { DROP_ZONE_ATTRIBUTE, DELETE_ZONE_ATTRIBUTE, SIDEBAR_ZONE_ATTRIBUTE };
@@ -150,17 +151,63 @@ function notifyAutoScroll(): void {
   _evaluateDropTarget(_lastClientX, _lastClientY, target instanceof Element ? target : null);
 }
 
+// ── 拖曳刪除的消失動畫（delete-ghost）──────────────────────────
+// forceFallback 的浮動分身在 SortableJS onEnd 前就被移除，泳道原區塊又在拖曳期間
+// 隱藏＋自欄寬排除，兩者都無法播「原地淡出」。解法：在 capture 階段的 mouseup
+// （早於 SortableJS document 層 bubble 的 _onDrop 清理）克隆分身＋記下螢幕位置，
+// 確認落點為刪除時，把克隆固定在原位補播紅紋淡出/縮小動畫（.drag-delete-fade）。
+const DELETE_GHOST_MS = 220; // 動畫 180ms + 保險餘裕
+let _deleteGhostSnapshot: { node: HTMLElement; rect: DOMRect } | null = null;
+
+function _captureDeleteGhost(): void {
+  _deleteGhostSnapshot = null;
+  if (!_dragState.isDragging) return;
+  if (_dragState.sourceType !== 'rotation-instance') return;
+  if (!_dragState.isOverDeleteZone || _dragState.isOverSidebar) return;
+  if (prefersReducedMotion()) return;
+  const fallbackEl = document.querySelector('.sortable-fallback');
+  if (!(fallbackEl instanceof HTMLElement)) return;
+  _deleteGhostSnapshot = {
+    node: fallbackEl.cloneNode(true) as HTMLElement,
+    rect: fallbackEl.getBoundingClientRect(),
+  };
+}
+
+// 落地確定是刪除後才呼叫：把克隆掛回 body 原螢幕位置播淡出，動畫尾移除。
+function _playDeleteGhost(): void {
+  const snap = _deleteGhostSnapshot;
+  _deleteGhostSnapshot = null;
+  if (!snap) return;
+  const { node, rect } = snap;
+  // 清掉 SortableJS 寫在分身上的 inline 定位（top/left/transform），改由外層 wrapper 定位。
+  node.style.position = 'static';
+  node.style.top = '';
+  node.style.left = '';
+  node.style.transform = 'none';
+  node.style.margin = '0';
+  const wrapper = document.createElement('div');
+  wrapper.className = 'drag-delete-fade';
+  wrapper.style.left = `${rect.left}px`;
+  wrapper.style.top = `${rect.top}px`;
+  wrapper.appendChild(node);
+  document.body.appendChild(wrapper);
+  setTimeout(() => wrapper.remove(), DELETE_GHOST_MS);
+}
+
 let _isDragOverListenerAttached = false;
 
 function _attachDragOverListener(): void {
   if (_isDragOverListenerAttached) return;
   window.addEventListener('mousemove', _handleDragOver);
+  // capture 階段：搶在 SortableJS 移除浮動分身前克隆（見 _captureDeleteGhost 註解）
+  window.addEventListener('mouseup', _captureDeleteGhost, true);
   _isDragOverListenerAttached = true;
 }
 
 function _detachDragOverListener(): void {
   if (!_isDragOverListenerAttached) return;
   window.removeEventListener('mousemove', _handleDragOver);
+  window.removeEventListener('mouseup', _captureDeleteGhost, true);
   _isDragOverListenerAttached = false;
 }
 
@@ -270,6 +317,15 @@ export function useBlockDrag() {
     // setTimeout：避免打斷 SortableJS 同步清理導致 dragEl 殘留（p1-1）；且與 reset 同拍消除 n9 閃爍。
     setTimeout(() => {
       commitDrop(snapshot);
+      // 落點確定為「拖曳刪除」→ 在分身原位補播消失動畫。
+      // ⚠ 此條件須與 commit.ts 的 isOverDeleteZone 刪除分支完全對齊（一體兩面，見該處註解）。
+      const isDeleteDrop =
+        snapshot.sourceType === 'rotation-instance' &&
+        !snapshot.isOverSidebar &&
+        snapshot.afterIn === null &&
+        snapshot.isOverDeleteZone;
+      if (isDeleteDrop) _playDeleteGhost();
+      else _deleteGhostSnapshot = null;
       _teardown();
     }, 0);
   }
