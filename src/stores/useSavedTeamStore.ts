@@ -206,15 +206,16 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
 
   /**
    * 建立空隊伍：把工作區重置為全新空白狀態（無角色、單一空白軸）並解除
-   * 當前隊伍綁定（回到自由模式）。不建立存檔、不需命名；可由 Undo 還原。
+   * 當前隊伍綁定（回到自由模式）。不建立存檔、不需命名。
    */
   function createEmptyWorkspace(): void {
     const rotationStore = useRotationStore();
     const characterStore = useCharacterStore();
     const { laneOrder } = useLaneOrder();
 
-    // 重置前記錄快照 → 可被 Undo 還原。
-    useHistory().record();
+    // 建立空隊伍＝與 loadTeam 同類的脈絡切換（重置工作區、解除綁定），清空歷史
+    // 而非記錄一步：否則此動作會殘留於 undo 堆疊，Undo 會退回上一個隊伍的內容。
+    useHistory().clear();
 
     const axisId = generateUUID();
     rotationStore.axes = [{ id: axisId, name: t('axis.defaultName', { n: 1 }), entries: [] }];
