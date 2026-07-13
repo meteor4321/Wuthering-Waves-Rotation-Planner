@@ -21,6 +21,8 @@ interface Props {
   isEditing?: boolean
   /** 文字反白：多選同步編輯時，批次成員鏡射輸入框的全選狀態 */
   isLabelHighlighted?: boolean
+  /** 編輯態邊框調暗：多選同步編輯時，批次成員的選取邊框比照輸入框調暗 */
+  isEditingDimmed?: boolean
   /** 是否正在播放刪除消失動畫 */
   isLeaving?: boolean
   /** 目前主軸選取總數（多選拖曳時，分身上顯示此數量徽章） */
@@ -32,6 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   isDanger: false,
   isEditing: false,
   isLabelHighlighted: false,
+  isEditingDimmed: false,
   isLeaving: false,
   multiSelectCount: 0,
 })
@@ -149,6 +152,7 @@ function onKeydown(event: KeyboardEvent): void {
       :is-selected="isSelected"
       :is-danger="isDanger"
       :is-label-highlighted="isLabelHighlighted"
+      :is-editing-dimmed="isEditingDimmed"
     />
 
     <!-- 多選拖曳數量徽章：放在 chip 之外（不被 chip overflow 裁切），平時 display:none，
@@ -256,12 +260,11 @@ function onKeydown(event: KeyboardEvent): void {
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
 
-/* 輸入框全選文字的反白：反相（深底＋白字），與 BlockChip
+/* 輸入框全選文字的反白：實心海軍藍底＋白字，與 BlockChip
    .block-chip__label--highlighted 同款，使多選同步編輯時主要區塊
-   與批次成員的反白看起來是同一個選取。半透明青底在淺色屬性塊上會糊掉，
-   故改用實心深底＋白字，在任何底色上都清楚。 */
+   與批次成員的反白看起來是同一個選取。海軍藍在任何底色上都與白字高對比。 */
 .rotation-block__input::selection {
-  background-color: rgba(8, 12, 24, 0.92);
+  background-color: #00217d;
   color: #ffffff;
 }
 </style>

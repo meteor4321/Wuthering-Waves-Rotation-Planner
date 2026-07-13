@@ -19,6 +19,8 @@ interface Props {
   isDanger?: boolean
   /** true 時文字反白（多選同步編輯時，批次成員鏡射輸入框的全選狀態） */
   isLabelHighlighted?: boolean
+  /** true 時選取邊框調暗（多選同步編輯時，批次成員比照輸入框的淡青邊框） */
+  isEditingDimmed?: boolean
   /** true 時用較小尺寸（側邊欄預設/模板庫，相對主軸略縮小） */
   compact?: boolean
 }
@@ -28,6 +30,7 @@ withDefaults(defineProps<Props>(), {
   isSelected: false,
   isDanger: false,
   isLabelHighlighted: false,
+  isEditingDimmed: false,
   compact: false,
 })
 </script>
@@ -37,7 +40,8 @@ withDefaults(defineProps<Props>(), {
     class="block-chip"
     :class="{
       'block-chip--hovered': isHovered && !isSelected && !isDanger,
-      'block-chip--selected': isSelected && !isDanger,
+      'block-chip--selected': isSelected && !isDanger && !isEditingDimmed,
+      'block-chip--editing-dim': isEditingDimmed && !isDanger,
       'block-chip--danger': isDanger,
       'block-chip--compact': compact,
     }"
@@ -132,17 +136,13 @@ withDefaults(defineProps<Props>(), {
 
 /* ── 狀態：文字反白（isLabelHighlighted）──────────────────────
    多選同步編輯時，批次成員鏡射輸入框的「全選文字」視覺，提示這些字
-   會被一起取代。與 RotationBlock 輸入框的 ::selection 同款：改用「反相」
-   —— 不透明深底 + 白字 + 亮青外環。半透明青底在淺色屬性塊（氣動綠、衍射黃、
-   凝夜青）上會糊掉看不清，故改用實心深底，在任何底色上都清楚跳出；
-   深色塊上再靠亮青外環界定範圍。 */
+   會被一起取代。與 RotationBlock 輸入框的 ::selection 同款：實心海軍藍底
+   + 白字。海軍藍在任何底色（含淺色屬性塊：氣動綠、衍射黃、凝夜青）上都
+   與白字保持高對比、清楚跳出；不再加青色外環（去掉圈狀邊框）。 */
 .block-chip__label--highlighted {
-  background-color: rgba(8, 12, 24, 0.92);
-  border-radius: 2px;
-  /* 內側微擴深底＋外側亮青環：深底保證對比，青環在深色塊上定界。 */
-  box-shadow:
-    0 0 0 2px rgba(8, 12, 24, 0.92),
-    0 0 0 3.5px #67e8f9;
+  /* 與最左塊輸入框的原生 ::selection 對齊：緊貼文字的方角矩形，
+     不加 border-radius/box-shadow 外擴，否則批次成員會比最左塊多一圈圓角。 */
+  background-color: #00217d;
 }
 
 /* ── 尺寸：精簡（compact）──────────────────────────────────────
@@ -174,6 +174,16 @@ withDefaults(defineProps<Props>(), {
     0 0 16px rgba(34, 211, 238, 0.55),
     0 0  5px rgba(34, 211, 238, 0.80),
     inset 0 0 10px rgba(34, 211, 238, 0.18);
+}
+
+/* ── 狀態：編輯態邊框調暗（isEditingDimmed）─────────────────────
+   多選同步編輯時，最左塊化為輸入框（本身即為淡青調暗邊框），其餘批次成員
+   仍是 chip；此狀態讓這些成員的選取邊框比照輸入框調暗，使整批選取在編輯期間
+   一致（不再只有最左塊變暗、其他仍是亮青光暈）。淡青、低不透明度＋柔光暈，
+   與 RotationBlock__input 的 border/box-shadow 對齊。 */
+.block-chip--editing-dim {
+  border-color: rgba(125, 211, 252, 0.85);
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
 
 /* ── 狀態：危險（isDanger）─────────────────────────────────── */

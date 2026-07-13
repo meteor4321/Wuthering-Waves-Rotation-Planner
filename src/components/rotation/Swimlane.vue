@@ -237,6 +237,17 @@ function isLabelHighlighted(entry: RotationEntry): boolean {
   )
 }
 
+// 編輯態邊框調暗：多選同步編輯時，最左塊化為輸入框（本身即為調暗的淡青邊框），
+// 其餘批次成員仍是 chip；讓這些成員的選取邊框也一起調暗，使「整批選取」在編輯
+// 期間看起來一致（否則只有最左塊變暗、其他仍是亮青選取光暈）。
+function isEditingDimmed(entry: RotationEntry): boolean {
+  return (
+    rotationStore.editingId !== null &&
+    entry.id !== rotationStore.editingId &&
+    rotationStore.editingBatchIds.includes(entry.id)
+  )
+}
+
 // 提交：寫入 store（空字串由 store.updateLabel 處理為刪除），結束編輯。
 // 多選同步編輯：使用者實際打過字（dirty）才把同一文字套用到全部批次成員
 // （同步批次 → 歷史合併為單一步）；沒打字就提交＝維持各自原字，只走單塊路徑
@@ -445,6 +456,7 @@ async function handleDeselectCharacter(): Promise<void> {
               :multi-select-count="rotationStore.selectedIds.size"
               :is-editing="rotationStore.editingId === entry.id"
               :is-label-highlighted="isLabelHighlighted(entry)"
+              :is-editing-dimmed="isEditingDimmed(entry)"
               :is-leaving="rotationStore.isLeaving(entry.id)"
               :style="blockStyle(entry.id)"
               role="listitem"
