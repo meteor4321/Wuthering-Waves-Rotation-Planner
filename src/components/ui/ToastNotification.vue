@@ -78,8 +78,14 @@ const variantConfig = {
   padding: 0.75rem 0.875rem 0.75rem 0;
 
   /* ── 視覺：科幻面板風格 ─── */
-  background-color: #0D1526;          /* 深藍黑底 */
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  /* 提高底色明度：原本 #0D1526 與主軸面板/泳道（#0b101d、#0D1320）幾乎同階，
+     浮層與背景融成一片；改用專案既有的較亮抬升面板色 #1b2740（等同各處 hover/
+     凸起面板），讓提示框像懸浮 HUD 面板從深底跳出。 */
+  background-color: #1b2740;          /* 抬升面板藍（較背景明亮一階） */
+  /* 邊框改用青色調並提高對比：原本 10% 白邊在同為深色的背景上幾乎看不見，
+     邊緣與背景融成一片；青色邊框（variant 會再各自覆寫色相）配合下方外緣光暈，
+     讓面板在深底上清楚浮起，且延續專案的青色 HUD 風格。 */
+  border: 1px solid rgba(103, 232, 249, 0.40);
   border-radius: 4px;
   /* 右下角切角，模擬 HUD 介面 */
   clip-path: polygon(
@@ -89,7 +95,8 @@ const variantConfig = {
   box-shadow:
     0  8px 32px rgba(0, 0, 0, 0.55),
     0  2px  8px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0  0   12px rgba(34, 211, 238, 0.18),   /* 青色外緣微光，強化與背景分離 */
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   /* ── 字型 ─── */
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
@@ -107,6 +114,14 @@ const variantConfig = {
 .indicator--success { background: #34D399; box-shadow: 0 0 6px rgba(52,  211, 153, 0.7); }
 .indicator--warning { background: #F5A623; box-shadow: 0 0 6px rgba(245, 166,  35, 0.7); }
 .indicator--danger  { background: #EF4444; box-shadow: 0 0 6px rgba(239,  68,  68, 0.7); }
+
+/* ── 邊框色相隨 variant ─────────────────────────────────────────
+   邊框跟隨該提示的語意色（與左側指示條同色系），使不同類型的提示在
+   深底上都清楚且一眼可辨。 */
+.toast--info    { border-color: rgba(34,  211, 238, 0.45); }
+.toast--success { border-color: rgba(52,  211, 153, 0.45); }
+.toast--warning { border-color: rgba(245, 166,  35, 0.45); }
+.toast--danger  { border-color: rgba(239,  68,  68, 0.50); }
 
 /* ── 圖示 ───────────────────────────────────────────────────── */
 .toast__icon {
