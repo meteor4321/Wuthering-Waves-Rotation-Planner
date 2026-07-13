@@ -15,7 +15,7 @@
 //   - 純 in-memory，不持久化。
 // ============================================================
 
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { deepClone } from '@/utils/deepClone';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useCharacterStore } from '@/stores/useCharacterStore';
@@ -30,16 +30,12 @@ import type { CharacterSlots, SlotIndex } from '@/types/character';
 function maxHistory(): number {
   return useSettings().settings.value.historyLimit;
 }
-/** 把佇列裁到目前上限（上限調低時亦於下次入列自動收斂）；
- *  回傳是否有紀錄因超過上限而被捨棄。 */
-function trimHistory(queue: Snapshot[]): boolean {
+/** 把佇列裁到目前上限（上限調低時亦於下次入列自動收斂）。 */
+function trimHistory(queue: Snapshot[]): void {
   const max = maxHistory();
-  let dropped = false;
   while (queue.length > max) {
     queue.shift();
-    dropped = true;
   }
-  return dropped;
 }
 
 interface Snapshot {
@@ -100,7 +96,7 @@ export function useHistory() {
     });
 
     past.value.push(_snapshot());
-    if (trimHistory(past.value)) showToast(t('toast.historyLimitReached'), 'warning');
+    trimHistory(past.value);
     future.value = []; // 新分支產生，清掉可重做的未來
   }
 
@@ -140,7 +136,7 @@ export function useHistory() {
   function commitPending(): void {
     if (!_pending) return;
     past.value.push(_pending);
-    if (trimHistory(past.value)) showToast(t('toast.historyLimitReached'), 'warning');
+    trimHistory(past.value);
     future.value = []; // 新分支產生，清掉可重做的未來
     _pending = null;
   }
@@ -168,8 +164,5 @@ export function useHistory() {
     _pending = s.pending;
   }
 
-  const canUndo = computed(() => past.value.length > 0);
-  const canRedo = computed(() => future.value.length > 0);
-
-  return { record, beginPending, commitPending, cancelPending, undo, redo, clear, snapshotStacks, restoreStacks, canUndo, canRedo };
+  return { record, beginPending, commitPending, cancelPending, undo, redo, clear, snapshotStacks, restoreStacks };
 }

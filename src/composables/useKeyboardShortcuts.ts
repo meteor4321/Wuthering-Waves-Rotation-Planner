@@ -166,6 +166,16 @@ export function useKeyboardShortcuts() {
   // 事件處理器
   // ──────────────────────────────────────────
 
+  /** 長按巡覽節流：重複事件（event.repeat）間隔未達 NAV_REPEAT_MS 時回 false；
+   *  首次按下（非重複）不受限。A/D 與 W/S 共用。 */
+  function _passNavRepeatThrottle(event: KeyboardEvent): boolean {
+    if (!event.repeat) return true;
+    const now = performance.now();
+    if (now - _lastNavRepeatAt < NAV_REPEAT_MS) return false;
+    _lastNavRepeatAt = now;
+    return true;
+  }
+
   /** 焦點在可輸入元素（input/textarea/select/contentEditable）時忽略快捷鍵。 */
   function _shouldIgnore(event: KeyboardEvent): boolean {
     const target = event.target as HTMLElement;
@@ -246,11 +256,7 @@ export function useKeyboardShortcuts() {
     // 光暈有足夠時間浮現、肉眼能跟上焦點移動；首次按下（非重複）不受限。
     if (!isCtrl && !event.altKey && (key.toLowerCase() === 'a' || key.toLowerCase() === 'd')) {
       event.preventDefault();
-      if (event.repeat) {
-        const now = performance.now();
-        if (now - _lastNavRepeatAt < NAV_REPEAT_MS) return;
-        _lastNavRepeatAt = now;
-      }
+      if (!_passNavRepeatThrottle(event)) return;
       materializeLaneSelection(); // 泳道選取＝視同全部選中 → A/D 從群組邊緣起跳
       nav.focusStep(key.toLowerCase() === 'a' ? -1 : 1);
       return;
@@ -260,11 +266,7 @@ export function useKeyboardShortcuts() {
     // 與 A/D 相同的長按節流，讓泳道高亮切換肉眼可跟。
     if (!isCtrl && !event.altKey && (key.toLowerCase() === 'w' || key.toLowerCase() === 's')) {
       event.preventDefault();
-      if (event.repeat) {
-        const now = performance.now();
-        if (now - _lastNavRepeatAt < NAV_REPEAT_MS) return;
-        _lastNavRepeatAt = now;
-      }
+      if (!_passNavRepeatThrottle(event)) return;
       nav.focusLaneStep(key.toLowerCase() === 'w' ? -1 : 1);
       return;
     }

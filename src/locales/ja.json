@@ -213,7 +213,6 @@
     "redone": "やり直しました",
     "nothingToUndo": "元に戻す操作がありません",
     "nothingToRedo": "やり直す操作がありません",
-    "historyLimitReached": "元に戻す上限に達しました。最も古い履歴を破棄しました",
     "templateExists": "同じブロックが既にライブラリにあります",
     "templatesAllExist": "選択したブロックはすべてライブラリに存在します",
     "templateAdded": "テンプレートライブラリに追加しました",

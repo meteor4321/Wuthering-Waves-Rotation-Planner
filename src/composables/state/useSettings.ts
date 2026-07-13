@@ -2,7 +2,7 @@
 // useSettings.ts — 全域使用者設定（module 單例，LocalStorage 持久化）。
 //
 // 設定項：
-//   - language          ：介面語言（目前僅繁中；切換器為佔位，值先持久化備用）。
+//   - language          ：介面語言（zh-CN / zh-TW / en / ja / ko，見 i18n/index.ts）。
 //   - autoUppercase     ：大寫鎖定 — 區塊文字提交時自動轉大寫（僅英文字母）。
 //   - animationsEnabled ：動畫效果總開關；關閉＝強制減少動態（等同 reduced-motion）。
 //   - historyLimit      ：復原/重做步數上限（夾在 HISTORY_LIMIT_BOUNDS）。
@@ -33,7 +33,7 @@ export interface ExportPrefs {
 }
 
 export interface AppSettings {
-  /** 介面語言（佔位）：'zh-TW' | 未來擴充。 */
+  /** 介面語言代碼（對應 i18n SUPPORTED_LOCALES）。 */
   language: string;
   /** 大寫鎖定：區塊文字提交時自動轉大寫。 */
   autoUppercase: boolean;

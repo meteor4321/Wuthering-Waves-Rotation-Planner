@@ -2,10 +2,10 @@
 // useClipboard.ts — 區塊剪貼簿：複製 / 剪下 / 貼上 / 向右複製。
 //
 // 設計原則：模組層級單例緩衝區（存 RotationEntry[]），讓所有元件共享同一份 →
-//           跨元件 Ctrl+C→Ctrl+V 語意一致；排序走 O(N) 遍歷主軸。
+//           跨元件 Ctrl+C→Ctrl+V 語意一致。
 // ============================================================
 
-import { ref, readonly } from 'vue';
+import { ref } from 'vue';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { showToast } from '@/composables/state/useToast';
@@ -15,22 +15,14 @@ import type { RotationEntry } from '@/types/rotation';
 
 // 模組層級單例（非 composable 內部 ref），確保「單一剪貼簿」語意。
 const _clipboardBuffer = ref<RotationEntry[]>([]);
-const _hasContent = ref(false);
 
 export function useClipboard() {
   const rotationStore = useRotationStore();
   const { scrollEntryIntoView } = useBoardScroll();
 
-  /** 取得依主軸時間順序排列的選取區塊（O(N) 遍歷）。 */
-  function _getSortedSelectedEntries(): RotationEntry[] {
-    const { entries, selectedEntries } = rotationStore;
-    const selectedIds = new Set(selectedEntries.map((e) => e.id));
-    return entries.filter((e) => selectedIds.has(e.id));
-  }
-
-  /** 把選取的 entries 深拷貝成剪貼簿項目（與主軸完全解耦）。 */
+  /** 把選取的 entries（selectedEntries 已依主軸時間序排列）深拷貝成剪貼簿項目。 */
   function _buildClipboardItems(): RotationEntry[] {
-    return _getSortedSelectedEntries().map((entry) => deepClone(entry));
+    return rotationStore.selectedEntries.map((entry) => deepClone(entry));
   }
 
   /** 複製選取到剪貼簿（不刪原區塊）；Ctrl+C。 */
@@ -38,7 +30,6 @@ export function useClipboard() {
     if (rotationStore.selectedEntries.length === 0) return;
 
     _clipboardBuffer.value = _buildClipboardItems();
-    _hasContent.value = _clipboardBuffer.value.length > 0;
 
     const n = _clipboardBuffer.value.length;
     if (n > 0) showToast(n === 1 ? t('toast.copied') : t('toast.copiedN', { n }), 'success');
@@ -49,7 +40,6 @@ export function useClipboard() {
     if (rotationStore.selectedEntries.length === 0) return;
 
     _clipboardBuffer.value = _buildClipboardItems();
-    _hasContent.value = _clipboardBuffer.value.length > 0;
     rotationStore.deleteSelectedBlocks();
   }
 
@@ -61,8 +51,7 @@ export function useClipboard() {
     let insertAfterIndex = entries.length - 1;
 
     if (selectedEntries.length > 0) {
-      const sortedSelected = _getSortedSelectedEntries();
-      const lastSelected = sortedSelected[sortedSelected.length - 1];
+      const lastSelected = selectedEntries[selectedEntries.length - 1];
       const lastIdx = entries.findIndex((e) => e.id === lastSelected.id);
       if (lastIdx !== -1) insertAfterIndex = lastIdx;
     }
@@ -78,24 +67,20 @@ export function useClipboard() {
 
   /** 向右複製選取，插在原位置之後；Ctrl+D。 */
   function duplicateRight(): void {
-    if (rotationStore.selectedEntries.length === 0) return;
-
-    const { entries } = rotationStore;
-    const sortedSelected = _getSortedSelectedEntries();
+    const { entries, selectedEntries } = rotationStore;
+    if (selectedEntries.length === 0) return;
 
     // 插入點＝最後一個選取區塊的全域索引。
-    const lastEntry = sortedSelected[sortedSelected.length - 1];
+    const lastEntry = selectedEntries[selectedEntries.length - 1];
     const insertAfterIndex = entries.findIndex((e) => e.id === lastEntry.id);
 
-    const itemsToInsert = sortedSelected.map((entry) => deepClone(entry));
+    const itemsToInsert = selectedEntries.map((entry) => deepClone(entry));
     // 向右複製亦視為貼上：清除原選取、改選中所有新複製出的區塊。
     const newIds = rotationStore.insertClonedBlocks(itemsToInsert, insertAfterIndex);
     rotationStore.selectBlocks(newIds);
   }
 
   return {
-    clipboardBuffer: readonly(_clipboardBuffer),
-    hasContent: readonly(_hasContent),
     copySelected,
     cutSelected,
     paste,

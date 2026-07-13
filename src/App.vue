@@ -390,8 +390,7 @@ function clearAllSelection(): void {
     display: block;
     transition: transform 0.12s ease;
   }
-  .tour-cursor--press svg,
-  .tour-cursor--drag svg {
+  .tour-cursor--press svg {
     transform: scale(0.82);
   }
   .tour-ripple {

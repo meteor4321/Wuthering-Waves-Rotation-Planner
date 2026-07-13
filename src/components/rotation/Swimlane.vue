@@ -105,7 +105,9 @@ const dragOptions = computed(
     // 改由下方 watch 在容器出現時手動 start，避免 SortableJS 收到 null 於 mounted 拋例外。
     immediate: false,
     onStart: handleDragStart,
-    onEnd: handleEnd,
+    // 所有落地（側邊欄拖入、同泳道重排）統一由 handleDragEnd 處理，
+    // 不綁 onAdd/onUpdate（其 index 在跨全域排序時不可靠，見 useBlockDrag）。
+    onEnd: handleDragEnd,
   })
 )
 
@@ -151,12 +153,6 @@ function handleDragStart(event: SortableEventLike): void {
   if (!entry) return
   const width = event.item?.getBoundingClientRect().width ?? 0
   onRotationDragStart(entry, width)
-}
-
-// 拖曳結束：所有落地（側邊欄拖入、同泳道重排、跨泳道）統一在此處理，
-// 不綁 onAdd/onUpdate（其 index 在跨全域排序時不可靠，見 useBlockDrag）。
-function handleEnd(event: SortableEventLike): void {
-  handleDragEnd(event)
 }
 
 // 區塊點擊選取 (支援 Ctrl/Meta 多選)

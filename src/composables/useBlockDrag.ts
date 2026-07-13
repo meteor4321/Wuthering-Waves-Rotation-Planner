@@ -295,10 +295,6 @@ export function useBlockDrag() {
     _attachDragOverListener();
   }
 
-  function setOverSidebar(val: boolean): void {
-    if (_dragState.isDragging) _dragState.isOverSidebar = val;
-  }
-
   // 側邊欄拖入與同泳道重排的落地全由 handleDragEnd 統一處理（自製全域落點）：
   //  - 不依賴 SortableJS 的 @add/@update index（跨全域排序時 @update 不觸發＝p10-3）。
   //  - 落地與 _teardown 同一個 setTimeout，使 store 更新與 isDragging 轉 false 同拍
@@ -388,7 +384,6 @@ export function useBlockDrag() {
     getOrCreatePendingInstanceId,
     onSidebarDragStart,
     onRotationDragStart,
-    setOverSidebar,
     notifyAutoScroll,
     handleDragEnd,
     getRotationSortableOptions,

@@ -7,7 +7,7 @@
 //   - 指標（tour-cursor）僅為視覺提示，指向正在操作的元件；漣漪標示點擊。
 //   - 版面重設、歷史/狀態還原由 useSpotlightTour 負責；本檔只演操作。
 //   - 以遞增 runToken 實作取消：primitives 每次檢查 token，過期即拋出中止。
-//   - 步驟腳本逐步建置（目前：Step 1）。
+//   - 步驟腳本見檔末 DEMOS（1~8 步各一支 demoStepN）。
 // ============================================================
 
 import { CHARACTER_MAP } from '@/constants/characters';

@@ -28,6 +28,7 @@ import { useLaneReorder } from '@/composables/board/useLaneReorder'
 import { useHistory } from '@/composables/state/useHistory'
 import { DELETE_ZONE_ATTRIBUTE, NEUTRAL_ZONE_ATTRIBUTE, useBlockDrag } from '@/composables/useBlockDrag'
 import { getElementColor } from '@/constants/elements'
+import { elementDisplayName } from '@/i18n'
 import { useSettings } from '@/composables/state/useSettings'
 import { prefersReducedMotion } from '@/utils/reducedMotion'
 import type { SlotIndex } from '@/types/character'
@@ -423,7 +424,7 @@ onMounted(() => {
       <span class="lane-drag-clone__bar" :style="{ backgroundColor: laneDrag.cloneColor }" />
       <span class="lane-drag-clone__name">{{ laneDrag.cloneName }}</span>
       <span v-if="laneDrag.cloneElement" class="lane-drag-clone__el" :style="{ color: laneDrag.cloneColor }">
-        {{ laneDrag.cloneElement }}
+        {{ elementDisplayName(laneDrag.cloneElement) }}
       </span>
     </div>
 

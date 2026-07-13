@@ -2,8 +2,10 @@
 // ============================================================
 // BlockChip.vue
 // 時間軸區塊的「純視覺無狀態元件」。
-// 所有互動狀態（isHovered、isSelected、isDanger）
-// 皆由父層注入，元件本身不持有任何響應式資料。
+// 所有互動狀態（isHovered、isSelected 等）皆由父層注入，
+// 元件本身不持有任何響應式資料。
+// 拖曳刪除的紅紋警告不在此處：由 useBlockDrag 掛 <body> class、
+// style.css 直接套在 SortableJS 浮動分身上（forceFallback 分身拿不到響應式 prop）。
 // ============================================================
 
 interface Props {
@@ -15,8 +17,6 @@ interface Props {
   isHovered?: boolean
   /** true 時顯示較強的青色光暈（多選狀態） */
   isSelected?: boolean
-  /** true 時疊加紅色斜條紋警告動畫（即將丟棄提示） */
-  isDanger?: boolean
   /** true 時文字反白（多選同步編輯時，批次成員鏡射輸入框的全選狀態） */
   isLabelHighlighted?: boolean
   /** true 時選取邊框調暗（多選同步編輯時，批次成員比照輸入框的淡青邊框） */
@@ -28,7 +28,6 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   isHovered: false,
   isSelected: false,
-  isDanger: false,
   isLabelHighlighted: false,
   isEditingDimmed: false,
   compact: false,
@@ -39,10 +38,9 @@ withDefaults(defineProps<Props>(), {
   <div
     class="block-chip"
     :class="{
-      'block-chip--hovered': isHovered && !isSelected && !isDanger,
-      'block-chip--selected': isSelected && !isDanger && !isEditingDimmed,
-      'block-chip--editing-dim': isEditingDimmed && !isDanger,
-      'block-chip--danger': isDanger,
+      'block-chip--hovered': isHovered && !isSelected,
+      'block-chip--selected': isSelected && !isEditingDimmed,
+      'block-chip--editing-dim': isEditingDimmed,
       'block-chip--compact': compact,
     }"
     :style="{ '--chip-bg': color }"
@@ -50,9 +48,6 @@ withDefaults(defineProps<Props>(), {
   >
     <!-- 基底色層 -->
     <div class="block-chip__bg" />
-
-    <!-- 危險斜紋遮罩層（isDanger 時才渲染以節省 GPU） -->
-    <div v-if="isDanger" class="block-chip__danger-overlay" aria-hidden="true" />
 
     <!-- 文字層（永遠在最上層） -->
     <span
@@ -186,58 +181,10 @@ withDefaults(defineProps<Props>(), {
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
 }
 
-/* ── 狀態：危險（isDanger）─────────────────────────────────── */
-/* 邊框轉紅 */
-.block-chip--danger {
-  border-color: rgba(239, 68, 68, 0.70);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
-}
-
-/* 斜紋遮罩層 */
-.block-chip__danger-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(239, 68, 68, 0.72)   0px,
-    rgba(239, 68, 68, 0.72)   5px,
-    rgba(185, 28,  28, 0.30)  5px,
-    rgba(185, 28,  28, 0.30) 11px
-  );
-  /* n8：tile 寫死為條紋週期的正方形(11√2)，與區塊寬度脫鉤，接縫永遠連續無斷層。
-     預設 background-size:auto 會讓 tile＝區塊寬度，寬度非週期整數倍時接縫斷層。 */
-  background-size: 15.5563px 15.5563px;
-  background-repeat: repeat;
-  /* 條紋流動動畫 */
-  animation: danger-march 1s linear infinite;
-}
-
-@keyframes danger-march {
-  from { background-position: 0 0; }
-  /* 11px×√2 ≈ 15.5563px：移動一整個 tile，且 x、y 同步移動讓條紋垂直自身方向
-     絲滑流動（只移單軸會變橫向滑且視覺怪）。tile 已與寬度脫鉤，故無斷層。
-     方向須 x、y 同號（-45deg 漸層的「/」條紋，垂直方向＝右下）；反號會沿條紋
-     自身方向移動而看起來靜止。 */
-  to   { background-position: 15.5563px 15.5563px; }
-}
-
-/* isDanger 時強化文字對比（條紋背景下仍可讀） */
-.block-chip--danger .block-chip__label {
-  color: #ffffff;
-  text-shadow:
-    0 0 6px rgba(0, 0, 0, 0.80),
-    0 1px 3px rgba(0, 0, 0, 0.60);
-}
-
 /* ── 無障礙：減少動畫模式 ──────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .block-chip {
     transition: none;
-  }
-  .block-chip__danger-overlay {
-    animation: none;
-    /* 靜態條紋仍保留視覺警示 */
   }
 }
 </style>

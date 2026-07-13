@@ -38,14 +38,3 @@ export type DragSourceType =
   | 'sidebar-general'    // 側邊欄通用區塊
   | 'sidebar-template'   // 側邊欄自訂模板
   | 'rotation-instance'; // 主軸現有實體
-
-/** 拖曳事件攜帶的資料。 */
-export interface DragPayload {
-  sourceType: DragSourceType;
-  /** 來源區塊的統一 id（不論來源皆對應區塊的泛用 id）。 */
-  sourceId: string;
-  /** 目標泳道索引；懸停時即時更新，放開時決定寫入哪條泳道。 */
-  targetSlotIndex: SlotIndex | null;
-  /** 插入在 1D 陣列哪個索引之後（-1=最前、length-1=最後）。 */
-  targetInsertAfterIndex: number;
-}

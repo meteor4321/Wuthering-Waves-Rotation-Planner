@@ -10,6 +10,7 @@ import { reactive, onBeforeUnmount, type Ref } from 'vue';
 import { useLaneOrder } from '@/composables/state/useLaneOrder';
 import { useCharacterStore } from '@/stores/useCharacterStore';
 import { getElementColor } from '@/constants/elements';
+import { t, characterDisplayName } from '@/i18n';
 import type { SlotIndex } from '@/types/character';
 
 interface LaneGeom { slotIndex: SlotIndex; top: number; height: number; mid: number }
@@ -66,7 +67,9 @@ export function useLaneReorder(boardRef: Ref<HTMLElement | null>) {
     laneDrag.cloneWidth = boardRef.value?.clientWidth ?? 0;
     laneDrag.cloneHeight = source.height;
     laneDrag.cloneColor = getElementColor(char?.element ?? null);
-    laneDrag.cloneName = char?.nameZh ?? `槽位 ${payload.slotIndex + 1}`;
+    laneDrag.cloneName = char
+      ? characterDisplayName(char)
+      : t('swimlane.laneEmpty', { n: payload.slotIndex + 1 });
     laneDrag.cloneElement = char?.element ?? '';
     _updateTarget(payload.event.clientY);
 

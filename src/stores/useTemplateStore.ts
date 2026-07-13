@@ -11,7 +11,7 @@ import { ref, computed, watch } from 'vue';
 import type { TemplateBlock, InstanceBlock } from '../types/block';
 import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
-import { showToast as showGlobalToast, type ToastVariant } from '@/composables/state/useToast';
+import { showToast } from '@/composables/state/useToast';
 import { t } from '@/i18n';
 
 /** LocalStorage 儲存鍵名 */
@@ -158,11 +158,6 @@ export const useTemplateStore = defineStore('templates', () => {
     selectedTemplateIds.value = new Set();
   }
 
-  /** 顯示右下角提示框（轉呼叫全域 useToast 單例）。 */
-  function showToast(message: string, variant: ToastVariant = 'info'): void {
-    showGlobalToast(message, variant);
-  }
-
   return {
     templates,
     selectedTemplateIds,
@@ -174,6 +169,5 @@ export const useTemplateStore = defineStore('templates', () => {
     clearTemplateSelection,
     isTemplateSelected,
     deleteSelectedTemplates,
-    showToast,
   };
 });

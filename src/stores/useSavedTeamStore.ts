@@ -232,16 +232,8 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
     currentTeamId.value = null;
   }
 
-  /**
-   * 開檔還原：若已綁定當前隊伍，把該存檔內容補進工作區。
-   * 排軸內容非持久化，重整後工作區會退回空白，但 currentTeamId 仍保留 →
-   * 若不補回內容，isDirty 會誤判「空工作區 ≠ 存檔」為有未存變更（可誤覆蓋成空）。
-   * 故啟動時還原一次；不記錄歷史、不改綁定；無綁定或找不到存檔則不動作。
-   */
-  function hydrateCurrentTeam(): void {
-    const team = teams.value.find((t) => t.id === currentTeamId.value);
-    if (!team) return;
-
+  /** 把存檔內容套進工作區（loadTeam / hydrateCurrentTeam 共用；不碰歷史與綁定）。 */
+  function applyTeamToWorkspace(team: SavedTeam): void {
     const rotationStore = useRotationStore();
     const characterStore = useCharacterStore();
     const { laneOrder } = useLaneOrder();
@@ -249,6 +241,7 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
     rotationStore.axes = deepClone(team.axes);
     characterStore.slots = deepClone(team.slots);
     laneOrder.value = deepClone(team.laneOrder);
+    // 作用中軸：套用存檔值；若該 id 不存在（防禦）則退回首軸。
     rotationStore.setActiveAxis(team.activeAxisId);
     if (rotationStore.activeAxisId !== team.activeAxisId && rotationStore.axes.length) {
       rotationStore.setActiveAxis(rotationStore.axes[0].id);
@@ -258,30 +251,24 @@ export const useSavedTeamStore = defineStore('savedTeams', () => {
     rotationStore.stopEditing();
   }
 
+  /**
+   * 開檔還原：若已綁定當前隊伍，把該存檔內容補進工作區。
+   * 排軸內容非持久化，重整後工作區會退回空白，但 currentTeamId 仍保留 →
+   * 若不補回內容，isDirty 會誤判「空工作區 ≠ 存檔」為有未存變更（可誤覆蓋成空）。
+   * 故啟動時還原一次；不記錄歷史、不改綁定；無綁定或找不到存檔則不動作。
+   */
+  function hydrateCurrentTeam(): void {
+    const team = teams.value.find((t) => t.id === currentTeamId.value);
+    if (team) applyTeamToWorkspace(team);
+  }
+
   /** 載入存檔：覆蓋當前工作區（可由 Undo 還原），並綁定為當前隊伍。 */
   function loadTeam(id: string): void {
     const team = teams.value.find((t) => t.id === id);
     if (!team) return;
-
-    const rotationStore = useRotationStore();
-    const characterStore = useCharacterStore();
-    const { laneOrder } = useLaneOrder();
-
     // 套用前記錄快照 → 載入可被 Undo 還原（Snapshot 已含 axes/slots/laneOrder）。
     useHistory().record();
-
-    rotationStore.axes = deepClone(team.axes);
-    characterStore.slots = deepClone(team.slots);
-    laneOrder.value = deepClone(team.laneOrder);
-    // 作用中軸：套用存檔值；若該 id 不存在（防禦）則 setActiveAxis 內部退回首軸。
-    rotationStore.setActiveAxis(team.activeAxisId);
-    if (rotationStore.activeAxisId !== team.activeAxisId && rotationStore.axes.length) {
-      rotationStore.setActiveAxis(rotationStore.axes[0].id);
-    }
-
-    rotationStore.clearSelection();
-    rotationStore.stopEditing();
-
+    applyTeamToWorkspace(team);
     currentTeamId.value = id;
   }
 

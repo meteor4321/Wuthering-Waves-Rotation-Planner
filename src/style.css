@@ -120,22 +120,6 @@ html.force-reduce-motion *::after {
     background-color: rgba(255, 255, 255, 0.10);
     border-radius: 2px;
   }
-
-  /*
-    刪除警告條紋背景。
-    當區塊被拖曳到無效放置區時套用此 class，
-    呈現紅色斜紋警示效果（CSS 漸層模擬條紋）。
-  */
-  .bg-danger-stripe {
-    background-image: repeating-linear-gradient(
-      -45deg,
-      rgba(239, 68, 68, 0.25) 0px,
-      rgba(239, 68, 68, 0.25) 6px,
-      rgba(239, 68, 68, 0.08) 6px,
-      rgba(239, 68, 68, 0.08) 12px
-    );
-    border: 1.5px solid rgba(239, 68, 68, 0.6);
-  }
 }
 
 /* ── Utilities Layer ───────────────────────────────────────── */

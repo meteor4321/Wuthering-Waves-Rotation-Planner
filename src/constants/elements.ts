@@ -29,11 +29,8 @@ interface ElementOverride {
 const generated = elementsGenerated as GeneratedElement[];
 const overrides = elementsOverrides as Record<string, ElementOverride>;
 
-/** 屬性正典順序（角色選單頁籤、資料排序共用）＝ generated 檔案順序。 */
-export const ELEMENT_ORDER: CharacterElement[] = generated.map((e) => e.name);
-
 /** 屬性代表色（hex）：由 overrides 建構（人工維護，非硬編碼於程式）。 */
-export const ELEMENT_COLORS: Record<CharacterElement, string> = Object.fromEntries(
+const ELEMENT_COLORS: Record<CharacterElement, string> = Object.fromEntries(
   Object.entries(overrides)
     .filter(([, o]) => o.color)
     .map(([name, o]) => [name, o.color as string]),
@@ -47,7 +44,7 @@ const ELEMENT_ICONS: Record<string, string> = Object.fromEntries(
 );
 
 /** 未選角 / 無屬性 / 未知屬性時的中性色。 */
-export const NEUTRAL_COLOR = '#64748B';
+const NEUTRAL_COLOR = '#64748B';
 
 /** 取得屬性代表色；傳入 null / 未知 / 缺色（新屬性尚未補色）時回中性色。 */
 export function getElementColor(element: CharacterElement | null | undefined): string {

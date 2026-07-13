@@ -80,9 +80,6 @@ export const useRotationStore = defineStore('rotation', () => {
 
   // ── Computed ───────────────────────────────
 
-  /** 主時間軸總區塊數。 */
-  const totalBlockCount = computed(() => entries.value.length);
-
   /** 被選中的條目（維持 1D 陣列的相對時間順序）。 */
   const selectedEntries = computed(() =>
     entries.value.filter((e) => selectedIds.value.has(e.id))
@@ -207,38 +204,15 @@ export const useRotationStore = defineStore('rotation', () => {
     return newIds;
   }
 
-  /** 主軸內移動單一區塊；允許跨泳道（一併更新 slotIndex 與 characterId）。 */
-  function moveBlock(
-    id: string,
-    toInsertAfterIndex: number,
-    newSlotIndex?: SlotIndex,
-    newCharacterId?: string
-  ): void {
+  /** 主軸內移動單一區塊（歸屬泳道不變，僅改全域順序）。 */
+  function moveBlock(id: string, toInsertAfterIndex: number): void {
     const fromIndex = findEntryIndexById(entries.value, id);
-
     if (fromIndex === -1) {
       console.warn(`[useRotationStore.moveBlock] 找不到 id: ${id}`);
       return;
     }
-
     history.record();
-    let newEntries = moveEntry(entries.value, fromIndex, toInsertAfterIndex);
-
-    if (newSlotIndex !== undefined || newCharacterId !== undefined) {
-      newEntries = newEntries.map((entry) => {
-        if (entry.id !== id) return entry;
-        return {
-          ...entry,
-          slotIndex: newSlotIndex ?? entry.slotIndex,
-          block: {
-            ...entry.block,
-            characterId: newCharacterId ?? entry.block.characterId,
-          },
-        };
-      });
-    }
-
-    entries.value = newEntries;
+    entries.value = moveEntry(entries.value, fromIndex, toInsertAfterIndex);
   }
 
   /**
@@ -451,7 +425,6 @@ export const useRotationStore = defineStore('rotation', () => {
     editingDraft,
     editingBatchIds,
     editingDraftDirty,
-    totalBlockCount,
     selectedEntries,
     startEditing,
     setEditingDraft,

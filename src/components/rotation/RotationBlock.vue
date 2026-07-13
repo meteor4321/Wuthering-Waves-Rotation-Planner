@@ -15,8 +15,6 @@ interface Props {
   color: string
   /** 是否被選取 */
   isSelected?: boolean
-  /** 危險狀態 (懸停於無效區的紅色警告) */
-  isDanger?: boolean
   /** 是否處於行內編輯（由父層控制：新增即編輯 / 雙擊編輯） */
   isEditing?: boolean
   /** 文字反白：多選同步編輯時，批次成員鏡射輸入框的全選狀態 */
@@ -31,7 +29,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
-  isDanger: false,
   isEditing: false,
   isLabelHighlighted: false,
   isEditingDimmed: false,
@@ -150,7 +147,6 @@ function onKeydown(event: KeyboardEvent): void {
       :color="color"
       :is-hovered="isHovered && !isSelected"
       :is-selected="isSelected"
-      :is-danger="isDanger"
       :is-label-highlighted="isLabelHighlighted"
       :is-editing-dimmed="isEditingDimmed"
     />
