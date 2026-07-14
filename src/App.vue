@@ -317,6 +317,21 @@ function clearAllSelection(): void {
     line-height: 1.5;
     color: rgba(240, 244, 248, 0.72);
   }
+  /* 快捷鍵徽章：以 <kbd> 標記按鍵組合（取代原本的角括號寫法），呈現鍵帽外觀。 */
+  .driver-popover.tour-popover .driver-popover-description kbd {
+    display: inline-block;
+    padding: 0.05em 0.4em;
+    margin: 0 0.1em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    color: rgba(240, 244, 248, 0.95);
+    background-color: rgba(34, 211, 238, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    border-radius: 4px;
+    box-shadow: 0 1px 0 rgba(34, 211, 238, 0.25);
+  }
   .driver-popover.tour-popover .driver-popover-progress-text {
     font-size: 0.6875rem;
     letter-spacing: 0.08em;
