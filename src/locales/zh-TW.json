@@ -189,7 +189,7 @@
     "step7Desc": "使用 Ctrl+X/C/V/D 剪下、複製、貼上與向右複製；使用 Ctrl+Z/Y 復原與重做。",
     "step8Title": "調整角色順序",
     "step8Desc": "拖曳以重新排列角色泳道。",
-    "step9Title": "多輸出軸",
+    "step9Title": "多開輸出軸",
     "step9Desc": "為同一支隊伍建立多條輸出軸。",
     "stepTeamsTitle": "儲存隊伍",
     "stepTeamsDesc": "儲存或載入隊伍排軸配置。",

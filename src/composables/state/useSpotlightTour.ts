@@ -194,6 +194,13 @@ function resetDemoBoard(): void {
   useSidebarCollapse().collapsed.value = false;
   // 側邊欄分頁重設回預設「通用」：避免 n2 切到「自訂」的分頁殘留到後續步驟。
   clickTab('tab-general');
+  // 水平捲動歸零：使 spotlight 邊框左緣與泳道 header 左緣對齊。前一步（n5 貼上/復原）
+  // 會把 board 捲到最右端，導致 .board__lanes 左緣被捲出視窗外，step8 的高亮框左緣
+  // 因而與 sticky 定位的泳道 header 左緣錯開。於 post-render 歸零讓兩者對齊。
+  nextTick(() => {
+    const scroll = document.querySelector<HTMLElement>('.board__scroll');
+    if (scroll) scroll.scrollLeft = 0;
+  });
 }
 
 /** 還原導覽開始前的版面。 */
