@@ -37,7 +37,8 @@
 ## Live Demo
 
 **[wuthering-waves-rotation-planner.vercel.app](https://wuthering-waves-rotation-planner.vercel.app/)**
-<!-- TODO: mp4 插入 -->
+
+https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
 
 ## 特色
 * 純視覺化操作
@@ -49,7 +50,7 @@
 
 ## 成品展示
 
-<img width="1920" alt="主畫面截圖" src="https://github.com/user-attachments/assets/6603d736-5f24-42e0-9c8f-84e1c59390e3" />
+<img width="2680" height="1280" alt="愛長千" src="https://github.com/user-attachments/assets/35039615-6f91-4554-a435-eb67ab2a34f6" />
 
 ## 功能
 
@@ -120,5 +121,5 @@ npm run build    # 型別檢查 + 產出
 
 ## 其他說明
 
-1. 部分翻譯可能有誤,歡迎回報
-2. 使用 VS Code 內建瀏覽器匯出圖片時會彈出兩次儲存對話框,第一次會產生壞檔,第二次為正常檔案
+1. 部分翻譯可能有誤，歡迎回報
+2. 使用 VS Code 內建瀏覽器匯出圖片時會彈出兩次儲存對話框，第一次會產生壞檔，第二次為正常檔案
