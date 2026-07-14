@@ -4,7 +4,7 @@
 // 底部「輸出軸」頁籤列（類似 Excel 工作表分頁）。
 //   - 點擊頁籤 → 切換作用中輸出軸
 //   - 雙擊頁籤 → 行內改名（Enter 提交 / Esc 取消 / 失焦提交）
-//   - 頁籤右側 ×  → 刪除（僅一條軸時隱藏）
+//   - 頁籤右上角 ×(hover 才浮現)→ 刪除（僅一條軸時隱藏）
 //   - 末端 ＋   → 新增輸出軸（彈出名稱輸入對話框，游標自動聚焦）
 // ============================================================
 
@@ -128,16 +128,16 @@ async function removeAxis(id: string, name: string): Promise<void> {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 4px 8px 0;
+  padding: 9px 10px 0;
   min-height: 2.25rem;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
 .axis-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
   flex: 0 0 auto;
   max-width: 14rem;
   padding: 0.35rem 0.7rem;
@@ -175,15 +175,29 @@ async function removeAxis(id: string, name: string): Promise<void> {
 }
 
 .axis-tab__close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
+  width: 0.875rem;
+  height: 0.875rem;
   border-radius: 50%;
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.45);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  background-color: rgba(19, 27, 46, 0.85);
+  opacity: 0;
+  pointer-events: none;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.axis-tab:hover .axis-tab__close,
+.axis-tab:focus-visible .axis-tab__close {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .axis-tab__close:hover {
