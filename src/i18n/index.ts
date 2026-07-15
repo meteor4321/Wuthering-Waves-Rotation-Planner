@@ -63,7 +63,9 @@ watch(
 watch(
   () => i18n.global.locale.value,
   () => {
-    document.title = i18n.global.t('seo.title');
+    // 分頁標題只取「|」前的第一段（如「鳴潮排軸編輯器」），
+    // seo.title 的完整長版仍保留給搜尋結果（index.html 靜態 <title>）。
+    document.title = i18n.global.t('seo.title').split('|')[0].trim();
     document
       .querySelector('meta[name="description"]')
       ?.setAttribute('content', i18n.global.t('seo.description'));
