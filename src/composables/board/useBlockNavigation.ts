@@ -73,6 +73,7 @@ export function useBlockNavigation() {
   /**
    * focusLaneStep：單一泳道巡覽（W/S）——依畫面上下顯示順序（laneOrder）在
    * 「已選角」的泳道間循環選取整條泳道；一併清除區塊選取（selectLane 內處理）。
+   * 僅選取單一區塊時，首次 W/S 先選取該區塊所在泳道（見函式內註解）。
    * @param direction -1 = 上（W）；1 = 下（S）
    */
   function focusLaneStep(direction: -1 | 1): void {
@@ -81,6 +82,17 @@ export function useBlockNavigation() {
       (si) => characterStore.slots[si].character !== null,
     );
     if (candidates.length === 0) return;
+
+    // 僅選取單一區塊時：W/S 一律先選取「該區塊所在泳道」（作為泳道巡覽的
+    // 進入點），而非直接從頂／底端循環起跳；下一次 W/S 再從此泳道續走。
+    if (rotationStore.selectedLaneIndex === null && rotationStore.selectedIds.size === 1) {
+      const [onlyId] = rotationStore.selectedIds;
+      const entry = rotationStore.entries.find((e) => e.id === onlyId);
+      if (entry && candidates.includes(entry.slotIndex)) {
+        rotationStore.selectLane(entry.slotIndex);
+        return;
+      }
+    }
 
     const current = rotationStore.selectedLaneIndex;
     const currentIdx = current === null ? -1 : candidates.indexOf(current);
