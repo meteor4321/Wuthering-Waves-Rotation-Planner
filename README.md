@@ -72,8 +72,8 @@ https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
 
 | Key | Action |
 | --- | --- |
-| `A` / `D` | Select the previous / next block |
-| `W` / `S` | Select the previous / next character track |
+| `A` / `D` (or `←` / `→`) | Select the previous / next block |
+| `W` / `S` (or `↑` / `↓`) | Select the previous / next character track |
 | `Space` | Add a block |
 | `Enter` | Edit the selected block |
 | `Delete` / `Backspace` | Delete selected blocks |
