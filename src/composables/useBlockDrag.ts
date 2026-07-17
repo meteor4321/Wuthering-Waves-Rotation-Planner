@@ -95,17 +95,22 @@ function _evaluateDropTarget(clientX: number, _clientY: number, target: Element 
     overForbidden || (!isRotationSource && overDeleteZone),
   );
 
-  // ── 自製落點預覽：算出全域 after-index（single thread 跨泳道同步擠出）──
-  // 側邊欄來源無法在 @start 取得寬度，於拖曳中首次讀浮動分身寬度並快取。
-  if (_dragState.draggingWidth === 0) {
-    const fallbackEl = document.querySelector('.sortable-fallback');
-    if (fallbackEl) _dragState.draggingWidth = fallbackEl.getBoundingClientRect().width;
-  }
   if (!overValid) {
     _dragState.previewInsertAfterIndex = null;
     _dragState.previewSlotIndex = null;
     clearHysteresis(); // 離開合法落點 → 清遲滯，再入時重新即時定位
     return;
+  }
+
+  // ── 自製落點預覽：算出全域 after-index（single thread 跨泳道同步擠出）──
+  // 側邊欄來源無法在 @start 取得寬度，於拖曳中首次讀浮動分身寬度並快取。
+  // ⚠ 必須在確認 overValid（上方稍早已移除 forbidden/delete body class）之後才量：
+  //   非法區時 .dragging-forbidden 會給分身加 1.5px 紅框，width:auto 的分身
+  //   shrink-to-fit 連 border 一起算，量出來多 3px → 落點空欄比落地區塊寬，
+  //   鬆手後欄寬「略微縮水」（通用與模板區塊皆中招）。
+  if (_dragState.draggingWidth === 0) {
+    const fallbackEl = document.querySelector('.sortable-fallback');
+    if (fallbackEl) _dragState.draggingWidth = fallbackEl.getBoundingClientRect().width;
   }
 
   if (isRotationSource) {
