@@ -20,7 +20,17 @@ import { characterDisplayName } from '@/i18n'
 import type { RotationAxis } from '@/types/rotation'
 import type { SlotIndex } from '@/types/character'
 
-const props = defineProps<{ axis: RotationAxis }>()
+const props = withDefaults(
+  defineProps<{
+    axis: RotationAxis
+    /** 是否顯示右下角浮水印。合併多軸時只有最後一軸開啟,整張圖僅出現一次。 */
+    watermark?: boolean
+  }>(),
+  { watermark: true },
+)
+
+/** 浮水印文字:固定英文專案名,不隨介面語言變動。 */
+const WATERMARK_TEXT = 'WuWa Rotation Planner'
 
 const characterStore = useCharacterStore()
 const { laneOrder } = useLaneOrder()
@@ -93,11 +103,15 @@ function laneColor(slot: SlotIndex): string {
         />
       </div>
     </div>
+
+    <!-- 右下角浮水印:低不透明度英文專案名,落在底部 padding 留白區。 -->
+    <div v-if="props.watermark" class="export-view__watermark">{{ WATERMARK_TEXT }}</div>
   </div>
 </template>
 
 <style scoped>
 .export-view {
+  position: relative; /* 供右下角浮水印絕對定位 */
   display: inline-block;
   padding: 2rem 2.25rem;
   background-color: #0A0F1E;
@@ -197,5 +211,19 @@ function laneColor(slot: SlotIndex): string {
 .export-lane__block {
   grid-row: 1;
   cursor: default;
+}
+
+/* 右下角浮水印:置於底部 padding 留白處,低不透明度、不搶版面。 */
+.export-view__watermark {
+  position: absolute;
+  right: 2.25rem;
+  bottom: 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(240, 244, 248, 0.28);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
 }
 </style>

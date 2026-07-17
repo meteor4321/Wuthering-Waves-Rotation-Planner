@@ -214,7 +214,13 @@ function clearAllSelection(): void {
          合併多軸時,export-merge-wrap 內縱向堆疊多個視圖,整塊截一張。 -->
     <div ref="exportStageRef" class="export-stage" aria-hidden="true">
       <div v-if="renderAxes.length" class="export-merge-wrap">
-        <RotationExportView v-for="ax in renderAxes" :key="ax.id" :axis="ax" />
+        <!-- 浮水印只掛最後一軸:合併圖整張僅右下角一枚;單軸/ZIP 逐軸各自成圖時每張都有。 -->
+        <RotationExportView
+          v-for="(ax, i) in renderAxes"
+          :key="ax.id"
+          :axis="ax"
+          :watermark="i === renderAxes.length - 1"
+        />
       </div>
     </div>
   </div>
