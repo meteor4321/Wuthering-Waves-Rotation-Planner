@@ -713,7 +713,11 @@ onMounted(() => {
 /* ── 框選矩形（marquee） ────────────────────────────────────── */
 .marquee-box {
   position: fixed;
-  z-index: 900;
+  /* 低於側邊欄（z:40）與收合鈕（z:50）：邊緣自動捲動使矩形左緣越過主軸
+     左緣時，從不透明側欄底下穿過（視覺上自然延伸出畫面）。仍高於主軸
+     內容——區塊/sticky header 都困在 .board__scroll 的 stacking context
+     （contain 所致，z:auto）內，任何正 z 皆可壓過。 */
+  z-index: 30;
   pointer-events: none;
   border: 1px solid rgba(34, 211, 238, 0.7);
   background: rgba(34, 211, 238, 0.12);

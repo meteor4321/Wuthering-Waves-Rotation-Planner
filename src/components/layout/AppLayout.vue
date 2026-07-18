@@ -118,6 +118,11 @@ const effectiveSidebarWidth = computed(() =>
   overflow-x: hidden;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background-color: #0D1320;
+  /* 抬到框選矩形（.marquee-box，z:30）之上：向右框選觸發邊緣自動捲動時，
+     矩形錨點釘在內容上、左緣會越過主軸左緣——讓它從不透明側欄「底下」
+     穿過去（看似自然延伸出畫面），而非突兀地蓋在側欄上。 */
+  position: relative;
+  z-index: 40;
 }
 
 /* 收合（細軌道）時：隱藏側欄內容與捲軸，只留下軌道與切換鈕 */
