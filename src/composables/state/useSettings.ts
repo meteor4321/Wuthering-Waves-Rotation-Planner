@@ -26,7 +26,7 @@ export const HISTORY_LIMIT_BOUNDS = { min: 5, max: 100 } as const;
 export const TRACK_GAP_BOUNDS = { min: 0, max: 16 } as const;
 /** 區塊文字左右邊距（px）的上下限。 */
 export const CHIP_PADDING_BOUNDS = { min: 4, max: 32 } as const;
-/** 區塊文字左右邊距預設值（px），與 BlockChip 原本寫死的 1rem 相同。 */
+/** 區塊文字左右邊距預設值（px），= BlockChip 的 1rem 基準。 */
 export const DEFAULT_CHIP_PADDING_PX = 16;
 
 export interface ExportPrefs {
