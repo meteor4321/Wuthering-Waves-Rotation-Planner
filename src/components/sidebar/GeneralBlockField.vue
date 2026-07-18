@@ -42,10 +42,16 @@ function handleDragStart(event: { oldIndex?: number }): void {
 const rootRef = ref<HTMLElement | null>(null)
 const editingId = ref<string | null>(null)
 const draft = ref('')
-// 輸入框寬度隨草稿即時撐開（ch＝monospace 單字寬，加左右內距）；空字串保底 1ch。
-const editStyle = computed(() => ({
-  width: `calc(${Math.max(draft.value.length, 1)}ch + 1.4rem)`,
-}))
+// 輸入框寬度隨草稿即時撐開；ch＝monospace 半形字寬，全形（CJK）約佔 2ch，
+// 逐字加總估寬，另補 letter-spacing（0.03em/字）累積量；空字串保底 1ch。
+const WIDE_CHAR_RE =
+  /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/
+const editStyle = computed(() => {
+  let ch = 0
+  for (const c of draft.value) ch += WIDE_CHAR_RE.test(c) ? 2 : 1
+  const spacing = (draft.value.length * 0.03).toFixed(2)
+  return { width: `calc(${Math.max(ch, 1)}ch + ${spacing}em + 1.4rem)` }
+})
 // 進入編輯後聚焦輸入框並全選（focus 由 watch 在 DOM 更新後執行）。
 watch(editingId, (id) => {
   if (!id) return
