@@ -73,8 +73,8 @@ watch(
   },
 );
 
-// SEO：分頁標題與 meta description 隨語言同步（immediate 讓非預設語言的
-// 使用者首次載入即覆蓋 index.html 的靜態繁中版本）。
+// SEO：分頁標題與 meta description 隨語言同步（immediate 讓與所在語言頁
+// 不同語言的使用者首次載入即覆蓋該頁的靜態版本）。
 watch(
   () => i18n.global.locale.value,
   () => {

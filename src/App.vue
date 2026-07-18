@@ -26,7 +26,7 @@ import { useGeneralBlockStore } from '@/stores/useGeneralBlockStore'
 import { useSavedTeamStore } from '@/stores/useSavedTeamStore'
 import { nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-// JSZip 是重套件（僅「多軸分開匯出」才用到）：改於下方打包處動態 import()，
+// JSZip 是重套件（僅「多軸分開匯出」才用到）：於下方打包處動態 import()，
 // 拆成獨立 chunk、首屏不載入。
 import type { RotationAxis } from '@/types/rotation'
 

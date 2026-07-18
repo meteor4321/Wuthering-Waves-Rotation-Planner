@@ -145,7 +145,7 @@ withDefaults(defineProps<Props>(), {
    與 label 字級（規則置於基底之後，等特異性下後者勝出）。 */
 .block-chip--compact {
   --chip-height: 2.75rem;   /* 44px（主軸為 52px） */
-  /* 側邊欄同步跟隨設定值，按 0.875 比例縮小（原 0.875rem/1rem 之比），
+  /* 側邊欄同步跟隨設定值，按 0.875 比例縮小（compact 對主軸的固定比），
      使拖出主軸前後的寬度感一致。 */
   --chip-px: calc(var(--chip-px-setting, 1rem) * 0.875);
 }

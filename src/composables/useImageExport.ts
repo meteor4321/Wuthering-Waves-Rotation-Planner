@@ -6,8 +6,8 @@
 //   - savePng / saveSvg / saveZip：優先用 File System Access API 原生另存，不支援退回 <a download>。
 // ============================================================
 
-// html-to-image 是重套件（僅匯出時才用到）：改於 nodeToPngBlob/nodeToSvgBlob
-// 內動態 import()，讓它被拆成獨立 chunk、首屏不載入。
+// html-to-image 是重套件（僅匯出時才用到）：於 nodeToPngBlob/nodeToSvgBlob
+// 內動態 import()，拆成獨立 chunk、首屏不載入。
 /** 匯出底色,比照 app 背景,避免透明圖在淺色檢視器下看不清。 */
 const EXPORT_BG = '#0A0F1E';
 
