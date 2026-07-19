@@ -16,7 +16,7 @@ import {
 } from '@/composables/blockDrag/state';
 
 /** 游標所在區域(互斥,依優先序判定)。 */
-export type DropZone =
+type DropZone =
   /** 主軸區塊懸停於側邊欄序列化區 → 「拖回存成模板」落點(僅主軸來源)。 */
   | 'sidebar'
   /** 合法落點(泳道軌道內)。 */

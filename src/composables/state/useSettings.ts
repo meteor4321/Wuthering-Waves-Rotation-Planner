@@ -29,14 +29,14 @@ export const CHIP_PADDING_BOUNDS = { min: 4, max: 32 } as const;
 /** 區塊文字左右邊距預設值（px），= BlockChip 的 1rem 基準。 */
 export const DEFAULT_CHIP_PADDING_PX = 16;
 
-export interface ExportPrefs {
+interface ExportPrefs {
   filename: string;
   mode: ExportMode;
   format: ExportFormat;
   scale: number;
 }
 
-export interface AppSettings {
+interface AppSettings {
   /** 介面語言代碼（對應 i18n SUPPORTED_LOCALES）。 */
   language: string;
   /** 大寫鎖定：區塊文字提交時自動轉大寫。 */
