@@ -13,6 +13,7 @@ import { generateUUID } from '../utils/uuid';
 import { deepClone } from '../utils/deepClone';
 import { showToast } from '@/composables/state/useToast';
 import { t } from '@/i18n';
+import { useSettings } from '@/composables/state/useSettings';
 
 /** LocalStorage 儲存鍵名 */
 const STORAGE_KEY = 'wuwa-rotation-templates';
@@ -51,11 +52,18 @@ export const useTemplateStore = defineStore('templates', () => {
 
   // 依角色 id 篩模板，並依 label 字元數遞增排序（＝寬度遞增，免量 DOM）；
   // 字數相同時以建立時間為次序，維持穩定排列。
+  // 命名中的新模板（label 為空）一律排到最後，使其停在「＋」鈕旁的原地、
+  // 不被排序插到最前（比照通用區塊新增不重排的行為）；命名完成後才正常歸位。
   const getTemplatesByCharacter = computed(
     () => (characterId: string) =>
       templates.value
         .filter((t) => t.characterId === characterId)
-        .sort((a, b) => a.label.length - b.label.length || a.createdAt - b.createdAt)
+        .sort((a, b) => {
+          const aEmpty = a.label.trim() === '';
+          const bEmpty = b.label.trim() === '';
+          if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
+          return a.label.length - b.label.length || a.createdAt - b.createdAt;
+        })
   );
 
   /**
@@ -111,6 +119,39 @@ export const useTemplateStore = defineStore('templates', () => {
     }
   }
 
+  /** 新增一個空 label 的自訂模板（側邊欄 ＋ 鈕），回傳其 id（呼叫端隨即進入命名）。 */
+  function addTemplate(characterId: string, color: string): string {
+    const id = generateUUID();
+    templates.value = [
+      ...templates.value,
+      { id, label: '', color, source: 'template', characterId, tags: [], createdAt: Date.now() },
+    ];
+    return id;
+  }
+
+  /** 更新模板 label；trim 後為空＝刪除（比照通用區塊放棄命名）。
+   *  大寫鎖定（設定）開啟時自動轉大寫。同角色下 label 重複時不寫入：
+   *  發 toast 警告，若原本就是未命名的新模板則直接移除，否則保留原名。 */
+  function updateTemplateLabel(id: string, label: string): void {
+    const target = templates.value.find((tpl) => tpl.id === id);
+    if (!target) return;
+    let trimmed = label.trim();
+    if (useSettings().settings.value.autoUppercase) trimmed = trimmed.toUpperCase();
+    if (trimmed === '') {
+      deleteTemplate(id);
+      return;
+    }
+    const duplicated = templates.value.some(
+      (tpl) => tpl.id !== id && tpl.characterId === target.characterId && tpl.label.trim() === trimmed
+    );
+    if (duplicated) {
+      showToast(t('toast.templateExists'), 'warning');
+      if (target.label.trim() === '') deleteTemplate(id);
+      return;
+    }
+    templates.value = templates.value.map((tpl) => (tpl.id === id ? { ...tpl, label: trimmed } : tpl));
+  }
+
   /** 刪除指定自訂模板。 */
   function deleteTemplate(id: string): void {
     templates.value = templates.value.filter((t) => t.id !== id);
@@ -163,6 +204,8 @@ export const useTemplateStore = defineStore('templates', () => {
     selectedTemplateIds,
     getTemplatesByCharacter,
     serializeManyToTemplates,
+    addTemplate,
+    updateTemplateLabel,
     deleteTemplate,
     clearAllTemplates,
     toggleTemplateSelection,

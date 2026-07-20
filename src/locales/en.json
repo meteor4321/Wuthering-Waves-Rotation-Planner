@@ -20,10 +20,10 @@
     "templateCount": "{n} template | {n} templates",
     "noCharacter": "No character selected",
     "noCharacterLabel": "No character selected; custom templates unavailable",
-    "noTemplatesLabel": "This character has no custom templates yet",
     "emptyHint": "Drag blocks back from the timeline to save templates",
     "templatesOf": "Custom templates of {name}",
     "deleteTemplate": "Delete template {label}",
+    "addTemplate": "Add custom template for {name}",
     "addGeneralBlock": "Add general block",
     "deleteGeneralBlock": "Delete block {label}"
   },

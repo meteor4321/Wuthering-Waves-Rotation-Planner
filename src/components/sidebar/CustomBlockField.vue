@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // CustomBlockField.vue
-// 側邊欄「自訂模板」展示區，依目前三條泳道選中的角色即時分組顯示。
+// 側邊欄「自訂模板」展示與管理區，依目前三條泳道選中的角色即時分組顯示。
+// 支援：拖到主軸、＋新增後即命名、雙擊重命名、點擊選取（Ctrl 多選）、
+//       刪除鈕 / Delete 鍵刪除、多選整組拖曳（命名/新增比照 GeneralBlockField）。
 // 不靠父層傳資料，自己讀角色與模板兩個 store，是個獨立運作的面板。
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useTemplateStore } from '@/stores/useTemplateStore'
@@ -12,6 +14,7 @@ import { useSidebarDragList } from '@/composables/blockDrag/useSidebarDragList'
 import { getElementColor } from '@/constants/elements'
 import { characterDisplayName } from '@/i18n'
 import type { TemplateBlock } from '@/types/block'
+import type { Character } from '@/types/character'
 
 const templateStore = useTemplateStore()
 const characterStore = useCharacterStore()
@@ -63,10 +66,71 @@ function handleDelete(templateId: string): void {
   templateStore.deleteTemplate(templateId)
 }
 
+// ── 行內命名 / 重命名（比照 GeneralBlockField） ─────────────────
+const rootRef = ref<HTMLElement | null>(null)
+const editingId = ref<string | null>(null)
+const draft = ref('')
+// 輸入框寬度隨草稿即時撐開；全形（CJK）約佔 2ch，逐字估寬並補 letter-spacing。
+const WIDE_CHAR_RE =
+  /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/
+const editStyle = computed(() => {
+  let ch = 0
+  for (const c of draft.value) ch += WIDE_CHAR_RE.test(c) ? 2 : 1
+  const spacing = (draft.value.length * 0.03).toFixed(2)
+  return { width: `calc(${Math.max(ch, 1)}ch + ${spacing}em + 1.4rem)` }
+})
+// 進入編輯後聚焦輸入框並全選（DOM 更新後執行）。
+watch(editingId, (id) => {
+  if (!id) return
+  void nextTick(() => {
+    const el = rootRef.value?.querySelector<HTMLInputElement>('.chip-edit')
+    el?.focus()
+    el?.select()
+  })
+})
+
+function startEdit(template: TemplateBlock): void {
+  editingId.value = template.id
+  draft.value = template.label
+}
+
+let finishing = false
+function commitEdit(): void {
+  if (finishing || editingId.value === null) return
+  finishing = true
+  // 空字串＝刪除、同角色重名＝不寫入（皆由 store 內處理）
+  templateStore.updateTemplateLabel(editingId.value, draft.value)
+  editingId.value = null
+  finishing = false
+}
+function cancelEdit(): void {
+  if (finishing || editingId.value === null) return
+  finishing = true
+  const id = editingId.value
+  editingId.value = null
+  finishing = false
+  // 剛新增卻未命名（label 仍為空）→ 順手刪除避免殘留空塊。
+  const tpl = templateStore.templates.find((x) => x.id === id)
+  if (tpl && tpl.label.trim() === '') templateStore.deleteTemplate(id)
+}
+function onEditKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter') { event.preventDefault(); commitEdit() }
+  else if (event.key === 'Escape') { event.preventDefault(); cancelEdit() }
+}
+
+// ＋ 新增：建一個空 label 模板（色用角色屬性色），立即進入命名。
+function addAndEdit(character: Character | null): void {
+  if (!character) return
+  const id = templateStore.addTemplate(character.id, getElementColor(character.element))
+  editingId.value = id
+  draft.value = ''
+}
+
 // 點擊模板：Ctrl/Cmd 多選切換；純點擊單選/再點同一個則取消。
 // 拖曳後 SortableJS 仍可能補發 click，但落點是拖移而非真點擊，
 // 影響僅止於選取狀態切換（無破壞性），可接受。
 function handleTemplateClick(templateId: string, event: MouseEvent): void {
+  if (editingId.value !== null) return
   const additive = event.ctrlKey || event.metaKey
   templateStore.toggleTemplateSelection(templateId, additive)
 }
@@ -96,7 +160,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="custom-block-field">
+  <section ref="rootRef" class="custom-block-field">
     <div
       v-for="(slot, displayIdx) in orderedSlots"
       :key="slot.slotIndex"
@@ -125,14 +189,6 @@ onUnmounted(() => {
         <span class="empty-text">{{ $t('sidebar.noCharacter') }}</span>
       </div>
 
-      <div
-        v-else-if="localTemplatesPerSlot[slot.slotIndex].length === 0"
-        class="empty-placeholder empty-placeholder--hint"
-        :aria-label="$t('sidebar.noTemplatesLabel')"
-      >
-        <span class="empty-text">{{ $t('sidebar.emptyHint') }}</span>
-      </div>
-
       <div v-else class="chip-row" :aria-label="$t('sidebar.templatesOf', { name: characterDisplayName(slot.character) })">
         <VueDraggable
           v-model="localTemplatesPerSlot[slot.slotIndex]"
@@ -149,24 +205,62 @@ onUnmounted(() => {
             :key="template.id"
             class="chip-wrapper"
             @click.stop="handleTemplateClick(template.id, $event)"
+            @dblclick.stop="startEdit(template)"
           >
-            <BlockChip
-              :label="template.label"
-              :color="slot.character ? getElementColor(slot.character.element) : template.color"
-              :is-selected="templateStore.isTemplateSelected(template.id)"
-              compact
+            <!-- 命名 / 重命名：以輸入框取代 chip（比照 GeneralBlockField）。 -->
+            <input
+              v-if="editingId === template.id"
+              v-model="draft"
+              class="chip-edit"
+              :style="editStyle"
+              type="text"
+              @keydown="onEditKeydown"
+              @blur="commitEdit"
+              @click.stop
+              @dblclick.stop
+              @mousedown.stop
+              @pointerdown.stop
             />
+            <template v-else>
+              <BlockChip
+                :label="template.label"
+                :color="slot.character ? getElementColor(slot.character.element) : template.color"
+                :is-selected="templateStore.isTemplateSelected(template.id)"
+                compact
+              />
 
-            <button
-              class="delete-btn"
-              :aria-label="$t('sidebar.deleteTemplate', { label: template.label })"
-              @click.stop="handleDelete(template.id)"
-            >
-              <svg class="delete-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-              </svg>
-            </button>
+              <button
+                class="delete-btn"
+                :aria-label="$t('sidebar.deleteTemplate', { label: template.label })"
+                @click.stop="handleDelete(template.id)"
+                @mousedown.stop
+                @pointerdown.stop
+              >
+                <svg class="delete-icon" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+              </button>
+            </template>
           </div>
+
+          <!-- ＋ 新增鈕：非 .chip-wrapper 故不被當可拖項（draggable:'.chip-wrapper'）。 -->
+          <button
+            class="add-block-btn"
+            type="button"
+            :aria-label="$t('sidebar.addTemplate', { name: characterDisplayName(slot.character) })"
+            :title="$t('sidebar.addTemplate', { name: characterDisplayName(slot.character) })"
+            @click.stop="addAndEdit(slot.character)"
+          >
+            ＋
+          </button>
+
+          <!-- 空庫提示：與 ＋ 鈕同列，僅在沒有任何模板時顯示。 -->
+          <span
+            v-if="localTemplatesPerSlot[slot.slotIndex].length === 0"
+            class="empty-text"
+          >
+            {{ $t('sidebar.emptyHint') }}
+          </span>
         </VueDraggable>
       </div>
 
@@ -239,10 +333,6 @@ onUnmounted(() => {
   border-radius: 3px;
 }
 
-.empty-placeholder--hint {
-  border-color: rgba(255, 255, 255, 0.07);
-}
-
 .empty-text {
   font-size: 0.6875rem;
   color: rgba(255, 255, 255, 0.5);
@@ -263,6 +353,7 @@ onUnmounted(() => {
 .chip-row__draggable {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;   /* ＋ 鈕／空庫提示與 chip 垂直置中對齊 */
   gap: 0.375rem;
   width: 100%;
 }
@@ -270,6 +361,52 @@ onUnmounted(() => {
 .chip-wrapper {
   position: relative;
   display: inline-flex;
+}
+
+/* ── 行內命名輸入框：外觀對齊 compact BlockChip（比照 GeneralBlockField）。 ── */
+.chip-edit {
+  box-sizing: border-box;
+  /* 寬度完全由 :style 隨草稿即時撐開（最小＝1 字寬＋內距） */
+  height: 2.75rem;               /* 44px，與 compact chip 同高 */
+  padding: 0 0.5rem;
+  border: 1.5px solid rgba(125, 211, 252, 0.85);
+  border-radius: 3px;
+  background-color: #1e293b;
+  color: #ffffff;
+  font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace),
+    'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  font-size: 0.9375rem;          /* 15px，與 compact chip label 一致 */
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.03em;
+  caret-color: #22d3ee;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
+}
+
+/* ── ＋ 新增鈕：虛線方框（比照 GeneralBlockField）。 ── */
+.add-block-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 2.75rem;               /* 與 compact chip 同高 */
+  border-radius: 3px;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.add-block-btn:hover,
+.add-block-btn:focus-visible {
+  border-color: rgba(34, 211, 238, 0.6);
+  color: rgba(34, 211, 238, 0.95);
+  background: rgba(34, 211, 238, 0.08);
+  outline: none;
 }
 
 /* 刪除按鈕 */

@@ -20,10 +20,10 @@
     "templateCount": "共 {n} 个模板",
     "noCharacter": "尚未选角",
     "noCharacterLabel": "尚未选角，无法显示自定义模板",
-    "noTemplatesLabel": "该角色尚无自定义模板",
     "emptyHint": "从主轴拖回区块以添加模板",
     "templatesOf": "{name} 的自定义模板",
     "deleteTemplate": "删除模板 {label}",
+    "addTemplate": "为 {name} 新增自定义模板",
     "addGeneralBlock": "新增通用区块",
     "deleteGeneralBlock": "删除区块 {label}"
   },

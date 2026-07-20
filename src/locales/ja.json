@@ -20,10 +20,10 @@
     "templateCount": "テンプレート {n} 件",
     "noCharacter": "キャラクター未選択",
     "noCharacterLabel": "キャラクター未選択のためカスタムテンプレートは利用できません",
-    "noTemplatesLabel": "このキャラクターにはまだカスタムテンプレートがありません",
     "emptyHint": "タイムラインからブロックをドラッグして戻すとテンプレートを保存できます",
     "templatesOf": "{name} のカスタムテンプレート",
     "deleteTemplate": "テンプレート {label} を削除",
+    "addTemplate": "{name} のカスタムテンプレートを追加",
     "addGeneralBlock": "汎用ブロックを追加",
     "deleteGeneralBlock": "ブロック {label} を削除"
   },

@@ -1,4 +1,10 @@
 <!-- code-review-graph MCP tools -->
+## Before Implementing
+
+**Before starting any implementation, make sure `code-review-graph watch`
+is enabled.** This keeps the knowledge graph current as files change, so the
+graph tools below return accurate results.
+
 ## MCP Tools: code-review-graph
 
 **IMPORTANT: This project has a knowledge graph. ALWAYS use the
