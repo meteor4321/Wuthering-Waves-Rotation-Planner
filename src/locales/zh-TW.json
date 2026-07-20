@@ -96,6 +96,8 @@
     "trackGapHint": "{min}–{max} px",
     "chipPadding": "區塊文字邊距",
     "chipPaddingHint": "{min}–{max} px，影響區塊寬度",
+    "chipFontSize": "區塊文字大小",
+    "chipFontSizeHint": "{min}–{max} px，影響區塊寬度",
     "rememberExport": "記住匯出設定",
     "rememberExportHint": "保留上次的檔名與合併方式",
     "clearData": "清除資料",

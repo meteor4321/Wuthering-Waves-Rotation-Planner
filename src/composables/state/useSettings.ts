@@ -28,6 +28,10 @@ export const TRACK_GAP_BOUNDS = { min: 0, max: 16 } as const;
 export const CHIP_PADDING_BOUNDS = { min: 4, max: 32 } as const;
 /** 區塊文字左右邊距預設值（px），= BlockChip 的 1rem 基準。 */
 export const DEFAULT_CHIP_PADDING_PX = 16;
+/** 區塊文字大小（px）的上下限。 */
+export const CHIP_FONT_SIZE_BOUNDS = { min: 12, max: 24 } as const;
+/** 區塊文字大小預設值（px），= BlockChip label 的 1rem 基準（compact 按比例縮）。 */
+export const DEFAULT_CHIP_FONT_SIZE_PX = 16;
 
 /**
  * 介面等寬字型選項。stack 注入 <html> 的 --app-font-mono，全站等寬字型
@@ -66,6 +70,8 @@ interface AppSettings {
   trackGapPx: number;
   /** 區塊文字左右邊距（px），影響區塊寬度。 */
   chipPaddingPx: number;
+  /** 區塊文字大小（px），影響區塊寬度。 */
+  chipFontSizePx: number;
   /** 介面等寬字型（FONT_OPTIONS 之一）。 */
   appFont: FontOptionValue;
   /** 記住匯出設定（每次調整即持久化）。 */
@@ -81,6 +87,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   historyLimit: 30,
   trackGapPx: TRACK_GAP_PX,
   chipPaddingPx: DEFAULT_CHIP_PADDING_PX,
+  chipFontSizePx: DEFAULT_CHIP_FONT_SIZE_PX,
   appFont: DEFAULT_FONT,
   rememberExport: false,
   exportPrefs: { filename: '', mode: 'merge', format: 'png', scale: DEFAULT_PIXEL_RATIO },
@@ -106,6 +113,7 @@ function loadSettings(): AppSettings {
     merged.historyLimit = clampSetting(merged.historyLimit, HISTORY_LIMIT_BOUNDS, DEFAULT_SETTINGS.historyLimit);
     merged.trackGapPx = clampSetting(merged.trackGapPx, TRACK_GAP_BOUNDS, DEFAULT_SETTINGS.trackGapPx);
     merged.chipPaddingPx = clampSetting(merged.chipPaddingPx, CHIP_PADDING_BOUNDS, DEFAULT_SETTINGS.chipPaddingPx);
+    merged.chipFontSizePx = clampSetting(merged.chipFontSizePx, CHIP_FONT_SIZE_BOUNDS, DEFAULT_SETTINGS.chipFontSizePx);
     // 字型代碼驗證：未知值（如舊版存檔或手改）回退預設。
     if (!FONT_OPTIONS.some((f) => f.value === merged.appFont)) merged.appFont = DEFAULT_FONT;
     return merged;
@@ -148,6 +156,17 @@ if (typeof document !== 'undefined') {
     () => settings.value.chipPaddingPx,
     (px) => {
       document.documentElement.style.setProperty('--chip-px-setting', `${px}px`);
+    },
+    { immediate: true },
+  );
+
+  // 區塊文字大小 → 於 <html> 注入 --chip-fs-setting CSS 變數，
+  // BlockChip label / RotationBlock 輸入框 / style.css 拖曳分身規則統一引用
+  //（compact 版按固定比例縮小）。immediate 使載入即生效。
+  watch(
+    () => settings.value.chipFontSizePx,
+    (px) => {
+      document.documentElement.style.setProperty('--chip-fs-setting', `${px}px`);
     },
     { immediate: true },
   );

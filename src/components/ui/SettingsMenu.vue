@@ -19,6 +19,7 @@ import {
   HISTORY_LIMIT_BOUNDS,
   TRACK_GAP_BOUNDS,
   CHIP_PADDING_BOUNDS,
+  CHIP_FONT_SIZE_BOUNDS,
   FONT_OPTIONS,
 } from '@/composables/state/useSettings'
 import { useDialog } from '@/composables/state/useDialog'
@@ -59,6 +60,15 @@ function onChipPaddingInput(e: Event): void {
 function stepChipPadding(dir: number): void {
   settings.value.chipPaddingPx = clampSetting(
     settings.value.chipPaddingPx + dir, CHIP_PADDING_BOUNDS, settings.value.chipPaddingPx,
+  )
+}
+function onChipFontSizeInput(e: Event): void {
+  const v = Number((e.target as HTMLInputElement).value)
+  settings.value.chipFontSizePx = clampSetting(v, CHIP_FONT_SIZE_BOUNDS, settings.value.chipFontSizePx)
+}
+function stepChipFontSize(dir: number): void {
+  settings.value.chipFontSizePx = clampSetting(
+    settings.value.chipFontSizePx + dir, CHIP_FONT_SIZE_BOUNDS, settings.value.chipFontSizePx,
   )
 }
 const dialog = useDialog()
@@ -279,6 +289,28 @@ async function handleClearData(): Promise<void> {
             <span class="settings-menu__stepper" aria-hidden="true">
               <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipPadding(1)">▲</button>
               <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipPadding(-1)">▼</button>
+            </span>
+          </span>
+        </label>
+
+        <!-- 區塊文字大小 -->
+        <label class="settings-menu__row">
+          <span class="settings-menu__label">
+            {{ $t('settings.chipFontSize') }}
+            <span class="settings-menu__hint">{{ $t('settings.chipFontSizeHint', { min: CHIP_FONT_SIZE_BOUNDS.min, max: CHIP_FONT_SIZE_BOUNDS.max }) }}</span>
+          </span>
+          <span class="settings-menu__number-field">
+            <input
+              class="settings-menu__number"
+              type="number"
+              :min="CHIP_FONT_SIZE_BOUNDS.min"
+              :max="CHIP_FONT_SIZE_BOUNDS.max"
+              :value="settings.chipFontSizePx"
+              @change="onChipFontSizeInput"
+            />
+            <span class="settings-menu__stepper" aria-hidden="true">
+              <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipFontSize(1)">▲</button>
+              <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipFontSize(-1)">▼</button>
             </span>
           </span>
         </label>

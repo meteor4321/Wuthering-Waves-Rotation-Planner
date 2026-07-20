@@ -207,7 +207,7 @@ html.force-reduce-motion *::after {
 }
 .sortable-fallback.block-chip--compact .block-chip__label,
 .sortable-fallback.chip-wrapper .block-chip--compact .block-chip__label {
-  font-size: 1rem;       /* 16px，與主軸一致 */
+  font-size: var(--chip-fs-setting, 1rem); /* 跟隨設定值，與主軸一致 */
 }
 
 /* 多選拖曳：只有浮動分身（.sortable-fallback）顯示數量徽章。

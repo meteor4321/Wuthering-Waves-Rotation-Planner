@@ -218,7 +218,7 @@ function onKeydown(event: KeyboardEvent): void {
   caret-color: #06121a;
   font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace),
     'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
-  font-size: 1rem;
+  font-size: var(--chip-fs-setting, 1rem);
   font-weight: 700;
   text-align: center;
   letter-spacing: 0.05em;

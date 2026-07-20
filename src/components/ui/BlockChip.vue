@@ -115,7 +115,7 @@ withDefaults(defineProps<Props>(), {
      glyph 時會繼續往後找到黑體，故 var 內含 monospace generic 也不擋 CJK。 */
   font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace),
     'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
-  font-size: 1rem;       /* 16px：主軸（側邊欄 compact 為 15px） */
+  font-size: var(--chip-fs-setting, 1rem); /* 預設 16px（可由設定調整，注入於 <html>；側邊欄 compact 按比例縮） */
   font-weight: 700;      /* 粗體；700 有真字模，中文不會假粗擠筆畫 */
   letter-spacing: 0.05em;
   /* 維持霓虹白風格，靠描邊與背景分離 → 淺色塊不刺眼、深色塊不低對比。
@@ -152,7 +152,8 @@ withDefaults(defineProps<Props>(), {
   --chip-px: calc(var(--chip-px-setting, 1rem) * 0.875);
 }
 .block-chip--compact .block-chip__label {
-  font-size: 0.9375rem;     /* 15px（主軸為 17px） */
+  /* 側邊欄同步跟隨設定值，按 0.9375 比例縮小（= 預設 15px 對主軸 16px 的固定比）。 */
+  font-size: calc(var(--chip-fs-setting, 1rem) * 0.9375);
 }
 
 /* ── 狀態：懸停（isHovered）────────────────────────────────── */

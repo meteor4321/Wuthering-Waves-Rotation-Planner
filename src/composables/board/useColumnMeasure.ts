@@ -44,6 +44,8 @@ export function useColumnMeasure(measurerRef: Ref<HTMLElement | null> = ref(null
   // 同步寫入 <html>，nextTick 後讀到的即是新內距下的 chip 實寬。
   const { settings } = useSettings();
   watch(() => settings.value.chipPaddingPx, remeasureAfterRender);
+  // 區塊文字大小設定同理：--chip-fs-setting 變動後重量 chip 實寬。
+  watch(() => settings.value.chipFontSizePx, remeasureAfterRender);
 
   function handleResize(): void {
     void remeasureAfterRender();
