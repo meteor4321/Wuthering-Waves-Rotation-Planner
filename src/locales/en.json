@@ -119,7 +119,8 @@
     "captureHint": "Recording key… press any key to bind, {esc} to cancel",
     "settingsLabel": "Hotkey Map",
     "settingsHint": "Configure key mappings for Hotkey Input Mode",
-    "settingsEdit": "Edit Map"
+    "settingsEdit": "Edit Map",
+    "introToggle": "Enable / disable this long-press shortcut"
   },
   "settings": {
     "gearLabel": "Settings",

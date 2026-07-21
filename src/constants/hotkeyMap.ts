@@ -11,7 +11,7 @@
 // ============================================================
 
 import { GENERAL_BLOCKS } from './generalBlocks';
-import type { HotkeyMapEntry } from '../types/hotkey';
+import type { HotkeyMapEntry, IntroHotkeyEntry } from '../types/hotkey';
 
 /** 通用區塊 label → 預設物理鍵（event.code）。未列到的 label 種子時略過配鍵。 */
 const SEED_KEY_BY_LABEL: Record<string, string> = {
@@ -34,6 +34,17 @@ export const HOTKEY_SEED_SOURCE: ReadonlyArray<Pick<HotkeyMapEntry, 'label' | 'h
     hotkey: SEED_KEY_BY_LABEL[b.label],
     pressType: 'tap' as const,
   }));
+
+/**
+ * 入場技長按捷徑的預設種子（三條，對應 Digit1/2/3）。
+ * label 預設沿用通用區塊的「Intro」；預設啟用（此功能的用途即在此）。
+ * hotkey 恆為 `Digit{slot}`、pressType 恆為 hold，故不入結構（由消費端固定推導）。
+ */
+export const INTRO_HOTKEY_SEED: ReadonlyArray<IntroHotkeyEntry> = [
+  { slot: 1, label: 'Intro', enabled: true },
+  { slot: 2, label: 'Intro', enabled: true },
+  { slot: 3, label: 'Intro', enabled: true },
+];
 
 /**
  * 保留鍵（禁止綁定）的 event.code 集合。

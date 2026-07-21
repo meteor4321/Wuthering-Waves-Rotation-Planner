@@ -23,3 +23,18 @@ export interface HotkeyMapEntry {
   /** 單擊 / 長按。 */
   pressType: PressType;
 }
+
+/**
+ * 入場技長按捷徑：固定綁定 Digit1/2/3、pressType 恆為 hold 的特殊條目。
+ *   - 與 1/2/3 單擊切軸並存：keydown 立即切軸，長按（≥300ms）於該軸末端插入入場技。
+ *   - 鍵位與長按型別鎖定不可改；使用者僅能改 label 與啟停（enabled）。
+ *   - 全域三條（slot 1/2/3 對應畫面上第 1/2/3 條泳道），與使用者自訂條目分開儲存。
+ */
+export interface IntroHotkeyEntry {
+  /** 對應 Digit{slot} 與畫面顯示序（第 slot 條泳道）。 */
+  slot: 1 | 2 | 3;
+  /** 插入區塊時使用的文字（可編輯）。 */
+  label: string;
+  /** 是否啟用此捷徑（停用時長按 1/2/3 不插入，僅切軸）。 */
+  enabled: boolean;
+}

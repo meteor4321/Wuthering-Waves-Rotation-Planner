@@ -119,7 +119,8 @@
     "captureHint": "正在录入键位…按任意键绑定，{esc} 取消",
     "settingsLabel": "热键映射表",
     "settingsHint": "设置热键输入模式下的按键映射",
-    "settingsEdit": "编辑映射表"
+    "settingsEdit": "编辑映射表",
+    "introToggle": "启用 / 停用此长按快捷方式"
   },
   "settings": {
     "gearLabel": "设置",

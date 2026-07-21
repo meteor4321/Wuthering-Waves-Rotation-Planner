@@ -28,6 +28,9 @@ import type { HotkeyMapEntry, PressType } from '@/types/hotkey';
 const active = ref(false);
 // 暫停接收輸入（視窗 blur／滑鼠移出視窗）：不退出模式，回焦即恢復（§3.1）。
 const paused = ref(false);
+// 控制列（底部提示膠囊）是否可顯示：待側欄收合過渡完成、幽靈格置中後才為 true。
+// 避免在版面寬度過渡期間先渲染膠囊，導致提示文字換行抖動。
+const controlsReady = ref(false);
 // 進入模式前側邊欄是否已收合：退出時據此還原（模式自動收合側欄爭取軸面寬度）。
 let _sidebarWasCollapsed = false;
 // 單擊／長按閾值：keydown 起計、keyup 依按住時長判定（§3.3，寫死不設定）。
@@ -93,13 +96,17 @@ export function useHotkeyInputMode() {
     if (active.value) return;
     if (selectableLanes.value.length === 0) return; // 無任何角色可插入 → 模式無意義，不進入
     active.value = true;
+    controlsReady.value = false; // 進場先隱藏控制列，待版面定型後再顯示
     ensureLaneSelected(rotationStore.selectedLaneIndex);
     // 自動收合側邊欄爭取軸面寬度；退出時還原原本的收合狀態。
     _sidebarWasCollapsed = sidebarCollapse.collapsed.value;
     sidebarCollapse.collapsed.value = true;
-    // 等欄寬過渡定型後，把插入落點置中（過渡中量測會以瞬時寬度計算而偏掉）。
+    // 等欄寬過渡定型後，把插入落點置中（過渡中量測會以瞬時寬度計算而偏掉），
+    // 再顯示底部控制列 → 膠囊只在最終寬度下佈局，不會於過渡中換行抖動。
     window.setTimeout(() => {
-      if (active.value) centerGhostCell();
+      if (!active.value) return;
+      centerGhostCell();
+      controlsReady.value = true;
     }, SIDEBAR_TRANSITION_MS);
   }
 
@@ -108,6 +115,7 @@ export function useHotkeyInputMode() {
     if (!active.value) return;
     active.value = false;
     paused.value = false;
+    controlsReady.value = false;
     _pressStartAt.clear(); // 清掉未放開的按壓，避免下次進入誤判
     _pressingHotkey.value = null;
     _clearHoldPreview();
@@ -115,12 +123,13 @@ export function useHotkeyInputMode() {
     sidebarCollapse.collapsed.value = _sidebarWasCollapsed;
   }
 
-  /** 切換至畫面上第 n 條（0-based 顯示序）泳道；未選角則跳過（不動作）。 */
-  function setLaneByDisplayIndex(displayIndex: number): void {
+  /** 切換至畫面上第 n 條（0-based 顯示序）泳道；未選角則跳過。回 true＝有切換。 */
+  function setLaneByDisplayIndex(displayIndex: number): boolean {
     const slot = laneOrder.value[displayIndex];
-    if (slot === undefined) return;
-    if (!selectableLanes.value.includes(slot)) return;
+    if (slot === undefined) return false;
+    if (!selectableLanes.value.includes(slot)) return false;
     rotationStore.selectLane(slot);
+    return true;
   }
 
   /** 上一條/下一條已選角泳道（依顯示順序循環）。 */
@@ -268,7 +277,12 @@ export function useHotkeyInputMode() {
 
     if (event.code === 'Digit1' || event.code === 'Digit2' || event.code === 'Digit3') {
       event.preventDefault();
-      setLaneByDisplayIndex(Number(event.code.slice(-1)) - 1);
+      // 作業系統長按自動重複：忽略（首擊已切軸並起計時，勿重複起按）。
+      if (event.repeat) return;
+      // keydown 立即切軸；成功切到有選角的泳道才起長按計時
+      // → keyup 達閾值時於該軸末端插入入場技（beginPress 內另以 hasHotkey 過濾停用者）。
+      const switched = setLaneByDisplayIndex(Number(event.code.slice(-1)) - 1);
+      if (switched) beginPress(event.code);
       return;
     }
 
@@ -330,6 +344,7 @@ export function useHotkeyInputMode() {
   return {
     active,
     paused,
+    controlsReady,
     pressing,
     holdPreviewLabel,
     enteringId,

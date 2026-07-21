@@ -96,8 +96,11 @@ watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
     @mouseup="handleMouseUp"
     @contextmenu.prevent
   >
-    <!-- 控制列：模式名 ＋ 當前泳道 ＋ 操作提示 ＋ 退出鈕 -->
-    <div class="hotkey-overlay__bar" @click.stop @mousedown.stop @mouseup.stop>
+    <!-- 控制列：模式名 ＋ 當前泳道 ＋ 操作提示 ＋ 退出鈕。
+         待側欄收合過渡完成、幽靈格置中後才顯示（controlsReady），
+         避免在版面寬度過渡期間佈局導致提示文字換行抖動。 -->
+    <Transition name="hotkey-bar">
+    <div v-if="hotkeyMode.controlsReady.value" class="hotkey-overlay__bar" @click.stop @mousedown.stop @mouseup.stop>
       <span class="hotkey-overlay__title">{{ $t('hotkey.modeName') }}</span>
       <span v-if="hotkeyMode.paused.value" class="hotkey-overlay__paused">⏸ {{ $t('hotkey.paused') }}</span>
       <span v-if="currentLaneName" class="hotkey-overlay__lane">▸ {{ currentLaneName }}</span>
@@ -113,6 +116,7 @@ watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
         @click.stop="hotkeyMode.exit()"
       >✕ {{ $t('hotkey.exit') }}</button>
     </div>
+    </Transition>
   </div>
 </template>
 
@@ -204,5 +208,18 @@ watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
 .hotkey-overlay__exit:focus-visible {
   outline: 1px solid rgba(248, 113, 113, 0.6);
   outline-offset: 1px;
+}
+
+/* 控制列淡入：版面定型後才出現，只動 opacity（不動 transform，避免與置中定位互擾）。 */
+.hotkey-bar-enter-active {
+  transition: opacity 0.18s ease;
+}
+.hotkey-bar-enter-from {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hotkey-bar-enter-active {
+    transition: none;
+  }
 }
 </style>

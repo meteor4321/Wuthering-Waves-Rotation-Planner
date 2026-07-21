@@ -31,7 +31,7 @@ import { RESERVED_CODES, formatHotkey, MOUSE_LEFT, MOUSE_RIGHT } from '@/constan
 import type { PressType } from '@/types/hotkey'
 
 const { isOpen, close } = useHotkeyMapDialog()
-const { entries, conflictIds, hasConflict, addEntry, updateEntry, removeEntry, resetToDefaults } = useHotkeyMap()
+const { entries, introEntries, conflictIds, hasConflict, addEntry, updateEntry, removeEntry, updateIntro, resetToDefaults } = useHotkeyMap()
 const dialog = useDialog()
 const { t } = useI18n()
 
@@ -122,6 +122,16 @@ function onLabelInput(id: string, event: Event): void {
   updateEntry(id, { label: (event.target as HTMLInputElement).value })
 }
 
+/** 入場技 label 即時寫回（依 slot）。 */
+function onIntroLabelInput(slot: 1 | 2 | 3, event: Event): void {
+  updateIntro(slot, { label: (event.target as HTMLInputElement).value })
+}
+
+/** 切換入場技捷徑啟停。 */
+function toggleIntro(slot: 1 | 2 | 3, enabled: boolean): void {
+  updateIntro(slot, { enabled: !enabled })
+}
+
 async function handleReset(): Promise<void> {
   const ok = await dialog.confirm({
     title: t('hotkey.resetConfirmTitle'),
@@ -171,6 +181,44 @@ onUnmounted(stopCapture)
             <span class="hkmap-col hkmap-col--press">{{ $t('hotkey.colPress') }}</span>
             <span class="hkmap-col hkmap-col--del"></span>
           </div>
+
+          <!-- 入場技長按捷徑（釘選頂端；鍵與長按鎖定，以開關啟停） -->
+          <ul class="hkmap-list hkmap-list--intro">
+            <li v-for="intro in introEntries" :key="`intro-${intro.slot}`" class="hkmap-row">
+              <!-- label（可編輯） -->
+              <input
+                class="hkmap-col hkmap-col--label hkmap-label-input"
+                type="text"
+                :value="intro.label"
+                :placeholder="$t('hotkey.labelPlaceholder')"
+                maxlength="12"
+                @input="onIntroLabelInput(intro.slot, $event)"
+              />
+
+              <!-- 按鍵（鎖定：顯示 1/2/3，不可擷取） -->
+              <div class="hkmap-col hkmap-col--key">
+                <span class="hkmap-locked">{{ formatHotkey('Digit' + intro.slot, t) }}</span>
+              </div>
+
+              <!-- 按法（鎖定：長按） -->
+              <div class="hkmap-col hkmap-col--press">
+                <span class="hkmap-locked">{{ $t('hotkey.pressHold') }}</span>
+              </div>
+
+              <!-- 啟停開關（取代刪除鈕） -->
+              <button
+                type="button"
+                role="switch"
+                class="hkmap-col hkmap-col--del hkmap-toggle"
+                :class="{ 'hkmap-toggle--on': intro.enabled }"
+                :aria-checked="intro.enabled"
+                :title="$t('hotkey.introToggle')"
+                :aria-label="$t('hotkey.introToggle')"
+                @click="toggleIntro(intro.slot, intro.enabled)"
+              ><span class="hkmap-toggle__knob" aria-hidden="true"></span></button>
+            </li>
+          </ul>
+          <hr class="hkmap-divider" aria-hidden="true" />
 
           <!-- 條目清單 -->
           <ul class="hkmap-list">
@@ -312,10 +360,10 @@ onUnmounted(stopCapture)
   border-radius: 3px;
 }
 
-/* 四欄格線：label 彈性、其餘固定寬。 */
+/* 四欄格線：label 彈性、其餘固定寬。末欄放大以容納啟停開關（刪除鈕仍置中）。 */
 .hkmap-row {
   display: grid;
-  grid-template-columns: 1fr 6.5rem 6.5rem 1.6rem;
+  grid-template-columns: 1fr 6.5rem 6.5rem 2rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0;
@@ -449,6 +497,7 @@ onUnmounted(stopCapture)
 }
 
 .hkmap-del {
+  justify-self: center;
   width: 1.6rem;
   height: 1.6rem;
   padding: 0;
@@ -464,6 +513,69 @@ onUnmounted(stopCapture)
   border-color: rgba(248, 113, 113, 0.6);
   background: rgba(248, 113, 113, 0.12);
   color: rgba(248, 113, 113, 0.95);
+}
+
+/* 入場技捷徑：鎖定欄（鍵位／長按）以靜態灰字呈現，不可互動。 */
+.hkmap-list--intro {
+  max-height: none; /* 固定三條，不需獨立捲動 */
+}
+.hkmap-locked {
+  display: block;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(240, 244, 248, 0.55);
+  font-size: 0.72rem;
+  text-align: center;
+  cursor: default;
+}
+
+/* 啟停開關（取代刪除鈕）：緊湊膠囊，開＝青、關＝灰。 */
+.hkmap-toggle {
+  justify-self: center;
+  position: relative;
+  width: 28px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.hkmap-toggle__knob {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(240, 244, 248, 0.6);
+  transform: translateY(-50%);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.hkmap-toggle--on {
+  background: rgba(34, 211, 238, 0.25);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+.hkmap-toggle--on .hkmap-toggle__knob {
+  background: rgba(34, 211, 238, 0.95);
+  transform: translate(13px, -50%);
+}
+.hkmap-toggle:focus {
+  outline: none;
+}
+.hkmap-toggle:focus-visible {
+  border-color: rgba(34, 211, 238, 0.8);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.35);
+}
+
+/* 入場技與使用者自訂條目的分隔線。 */
+.hkmap-divider {
+  margin: 0.85rem 0 0.35rem;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* 類型一重複鍵位：完成鈕左側的單一警語。 */

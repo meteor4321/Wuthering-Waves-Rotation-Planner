@@ -119,7 +119,8 @@
     "captureHint": "キーを記録中…任意のキーで割り当て、{esc} でキャンセル",
     "settingsLabel": "ホットキーマップ",
     "settingsHint": "ホットキー入力モードのキー割り当てを設定",
-    "settingsEdit": "マップを編集"
+    "settingsEdit": "マップを編集",
+    "introToggle": "この長押しショートカットの有効 / 無効"
   },
   "settings": {
     "gearLabel": "設定",
