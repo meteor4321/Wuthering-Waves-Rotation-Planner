@@ -23,6 +23,7 @@
 // ============================================================
 
 import { ref, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useHotkeyMapDialog } from '@/composables/state/useHotkeyMapDialog'
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap'
 import { useDialog } from '@/composables/state/useDialog'
@@ -32,6 +33,7 @@ import type { PressType } from '@/types/hotkey'
 const { isOpen, close } = useHotkeyMapDialog()
 const { entries, conflictIds, hasConflict, addEntry, updateEntry, removeEntry, resetToDefaults } = useHotkeyMap()
 const dialog = useDialog()
+const { t } = useI18n()
 
 // 正在擷取鍵位的條目 id（null＝無）。
 const capturingId = ref<string | null>(null)
@@ -76,7 +78,7 @@ function onCaptureKeydown(event: KeyboardEvent): void {
   }
   // 純修飾鍵單獨按下：忽略，繼續等待實體鍵。
   if (RESERVED_CODES.has(event.code)) {
-    captureError.value = `「${formatHotkey(event.code)}」為保留鍵，不可綁定`
+    captureError.value = t('hotkey.reservedKey', { key: formatHotkey(event.code, t) })
     return
   }
 
@@ -122,10 +124,10 @@ function onLabelInput(id: string, event: Event): void {
 
 async function handleReset(): Promise<void> {
   const ok = await dialog.confirm({
-    title: '還原預設',
-    message: '當前的自訂熱鍵會被全部還原。確定嗎？',
-    confirmText: '還原',
-    cancelText: '取消',
+    title: t('hotkey.resetConfirmTitle'),
+    message: t('hotkey.resetConfirmMessage'),
+    confirmText: t('hotkey.resetConfirm'),
+    cancelText: t('hotkey.cancel'),
     danger: true,
   })
   if (ok) resetToDefaults()
@@ -154,19 +156,19 @@ onUnmounted(stopCapture)
           class="hkmap-dialog"
           role="dialog"
           aria-modal="true"
-          aria-label="熱鍵對映表"
+          :aria-label="$t('hotkey.mapLabel')"
           @keydown.esc.prevent="handleClose"
         >
-          <h2 class="hkmap-dialog__title">熱鍵對映表</h2>
-          <p class="hkmap-dialog__desc">
-            進入熱鍵輸入模式（<kbd>F</kbd>）後，按下這裡設定的鍵，即可在角色軸末端插入對應區塊。
-          </p>
+          <h2 class="hkmap-dialog__title">{{ $t('hotkey.mapTitle') }}</h2>
+          <i18n-t keypath="hotkey.mapDesc" tag="p" class="hkmap-dialog__desc" scope="global">
+            <template #key><kbd>F</kbd></template>
+          </i18n-t>
 
           <!-- 表頭 -->
           <div class="hkmap-row hkmap-row--head" aria-hidden="true">
-            <span class="hkmap-col hkmap-col--label">區塊文字</span>
-            <span class="hkmap-col hkmap-col--key">按鍵</span>
-            <span class="hkmap-col hkmap-col--press">按法</span>
+            <span class="hkmap-col hkmap-col--label">{{ $t('hotkey.colLabel') }}</span>
+            <span class="hkmap-col hkmap-col--key">{{ $t('hotkey.colKey') }}</span>
+            <span class="hkmap-col hkmap-col--press">{{ $t('hotkey.colPress') }}</span>
             <span class="hkmap-col hkmap-col--del"></span>
           </div>
 
@@ -178,7 +180,7 @@ onUnmounted(stopCapture)
                 class="hkmap-col hkmap-col--label hkmap-label-input"
                 type="text"
                 :value="entry.label"
-                placeholder="（未命名）"
+                :placeholder="$t('hotkey.labelPlaceholder')"
                 maxlength="12"
                 @input="onLabelInput(entry.id, $event)"
               />
@@ -197,9 +199,9 @@ onUnmounted(stopCapture)
                   }"
                   @click="capturingId === entry.id ? stopCapture() : startCapture(entry.id)"
                 >
-                  <template v-if="capturingId === entry.id">按下任意鍵</template>
-                  <template v-else-if="entry.hotkey">{{ formatHotkey(entry.hotkey) }}</template>
-                  <template v-else>未設定</template>
+                  <template v-if="capturingId === entry.id">{{ $t('hotkey.capturePrompt') }}</template>
+                  <template v-else-if="entry.hotkey">{{ formatHotkey(entry.hotkey, t) }}</template>
+                  <template v-else>{{ $t('hotkey.keyUnset') }}</template>
                 </button>
               </div>
 
@@ -210,21 +212,21 @@ onUnmounted(stopCapture)
                   class="hkmap-press__seg"
                   :class="{ 'hkmap-press__seg--on': entry.pressType === 'tap' }"
                   @click="setPressType(entry.id, 'tap')"
-                >單擊</button>
+                >{{ $t('hotkey.pressTap') }}</button>
                 <button
                   type="button"
                   class="hkmap-press__seg"
                   :class="{ 'hkmap-press__seg--on': entry.pressType === 'hold' }"
                   @click="setPressType(entry.id, 'hold')"
-                >長按</button>
+                >{{ $t('hotkey.pressHold') }}</button>
               </div>
 
               <!-- 刪除 -->
               <button
                 type="button"
                 class="hkmap-col hkmap-col--del hkmap-del"
-                title="刪除這條"
-                aria-label="刪除這條"
+                :title="$t('hotkey.deleteEntry')"
+                :aria-label="$t('hotkey.deleteEntry')"
                 @click="removeEntry(entry.id)"
               >✕</button>
             </li>
@@ -232,17 +234,17 @@ onUnmounted(stopCapture)
 
           <!-- 底部動作 -->
           <div class="hkmap-dialog__actions">
-            <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="addEntry()">＋ 新增條目</button>
-            <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="handleReset">還原預設</button>
+            <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="addEntry()">{{ $t('hotkey.addEntry') }}</button>
+            <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="handleReset">{{ $t('hotkey.resetDefaults') }}</button>
             <span class="hkmap-dialog__spacer" />
             <!-- 類型一：重複鍵位 → 完成鈕左側單一警語 + 停用完成 -->
-            <span v-if="hasConflict" class="hkmap-dialog__conflict">偵測到重複的熱鍵鍵位</span>
+            <span v-if="hasConflict" class="hkmap-dialog__conflict">{{ $t('hotkey.conflictKey') }}</span>
             <button
               type="button"
               class="hkmap-btn hkmap-btn--confirm"
               :disabled="hasConflict"
               @click="handleClose"
-            >完成</button>
+            >{{ $t('hotkey.done') }}</button>
           </div>
 
           <!-- 錄入聚光燈：擷取中壓暗整個視窗、只讓作用中的擷取欄透出，
@@ -250,9 +252,9 @@ onUnmounted(stopCapture)
                提示膠囊抽為 spotlight 的兄弟節點,z-index 高於作用欄 → 不被抬起的欄蓋住。 -->
           <template v-if="capturingId !== null">
             <div class="hkmap-spotlight" aria-hidden="true"></div>
-            <div class="hkmap-spotlight__hint" aria-hidden="true">
-              正在錄入鍵位...按任意鍵綁定，<kbd>Esc</kbd> 取消
-            </div>
+            <i18n-t keypath="hotkey.captureHint" tag="div" class="hkmap-spotlight__hint" aria-hidden="true" scope="global">
+              <template #esc><kbd>Esc</kbd></template>
+            </i18n-t>
           </template>
         </div>
       </div>

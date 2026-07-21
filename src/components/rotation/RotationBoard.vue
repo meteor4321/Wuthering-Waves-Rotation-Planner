@@ -521,10 +521,10 @@ onMounted(() => {
       v-if="!hotkeyMode.active.value"
       type="button"
       class="hotkey-mode-trigger"
-      title="熱鍵輸入模式：輸入對映鍵快速插入區塊"
-      aria-label="進入熱鍵輸入模式"
+      :title="$t('hotkey.triggerTitle')"
+      :aria-label="$t('hotkey.triggerLabel')"
       @click.stop="hotkeyMode.enter()"
-    >⌨ 熱鍵輸入 <kbd>F</kbd></button>
+    >⌨ {{ $t('hotkey.triggerText') }} <kbd>F</kbd></button>
 
     <!-- 熱鍵輸入模式覆蓋層（控制列＋滾輪切泳道；區塊插入由全域 keydown 分派） -->
     <HotkeyModeOverlay v-if="hotkeyMode.active.value" />

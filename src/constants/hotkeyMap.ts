@@ -66,17 +66,21 @@ export function isMouseHotkey(hotkey: string): boolean {
   return hotkey === MOUSE_LEFT || hotkey === MOUSE_RIGHT;
 }
 
+/** formatHotkey 用的翻譯函式型別（僅取 vue-i18n `t` 的最小簽章，避免相依整包 i18n）。 */
+type Translate = (key: string, named?: Record<string, unknown>) => string;
+
 /**
  * 把 event.code / 滑鼠保留字轉成擷取欄顯示的友善名。
  * 常見前綴（KeyX→X、DigitN→N）直接去前綴；其餘回傳原字串（已足夠辨識）。
+ * 滑鼠左右鍵與數字鍵盤有語系差異，經 t 翻譯（呼叫端傳入 useI18n 的 t）。
  */
-export function formatHotkey(hotkey: string): string {
+export function formatHotkey(hotkey: string, t: Translate): string {
   if (!hotkey) return '';
-  if (hotkey === MOUSE_LEFT) return '滑鼠左鍵';
-  if (hotkey === MOUSE_RIGHT) return '滑鼠右鍵';
+  if (hotkey === MOUSE_LEFT) return t('hotkey.mouseLeft');
+  if (hotkey === MOUSE_RIGHT) return t('hotkey.mouseRight');
   if (hotkey.startsWith('Key')) return hotkey.slice(3);
   if (hotkey.startsWith('Digit')) return hotkey.slice(5);
-  if (hotkey.startsWith('Numpad')) return `數字鍵盤 ${hotkey.slice(6)}`;
+  if (hotkey.startsWith('Numpad')) return t('hotkey.numpad', { n: hotkey.slice(6) });
   if (hotkey.startsWith('Arrow')) return hotkey.slice(5);
   return hotkey;
 }

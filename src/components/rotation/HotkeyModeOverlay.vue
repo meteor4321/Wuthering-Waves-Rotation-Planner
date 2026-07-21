@@ -98,20 +98,20 @@ watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
   >
     <!-- 控制列：模式名 ＋ 當前泳道 ＋ 操作提示 ＋ 退出鈕 -->
     <div class="hotkey-overlay__bar" @click.stop @mousedown.stop @mouseup.stop>
-      <span class="hotkey-overlay__title">熱鍵輸入模式</span>
-      <span v-if="hotkeyMode.paused.value" class="hotkey-overlay__paused">⏸ 已暫停（點回視窗恢復）</span>
+      <span class="hotkey-overlay__title">{{ $t('hotkey.modeName') }}</span>
+      <span v-if="hotkeyMode.paused.value" class="hotkey-overlay__paused">⏸ {{ $t('hotkey.paused') }}</span>
       <span v-if="currentLaneName" class="hotkey-overlay__lane">▸ {{ currentLaneName }}</span>
       <span class="hotkey-overlay__hint">
-        <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>／滾輪 切換泳道 ·
-        <kbd>Delete</kbd> 刪除末塊
+        <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>／{{ $t('hotkey.wheel') }} {{ $t('hotkey.switchLane') }} ·
+        <kbd>Delete</kbd> {{ $t('hotkey.deleteLast') }}
       </span>
       <button
         type="button"
         class="hotkey-overlay__exit"
-        title="退出熱鍵輸入模式 (Esc)"
-        aria-label="退出熱鍵輸入模式"
+        :title="$t('hotkey.exitTitle')"
+        :aria-label="$t('hotkey.exitLabel')"
         @click.stop="hotkeyMode.exit()"
-      >✕ 退出</button>
+      >✕ {{ $t('hotkey.exit') }}</button>
     </div>
   </div>
 </template>

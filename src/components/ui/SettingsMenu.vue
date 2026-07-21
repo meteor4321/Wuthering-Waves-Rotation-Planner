@@ -346,11 +346,11 @@ async function handleClearData(): Promise<void> {
         <!-- 熱鍵對映表：開啟獨立編輯視窗（條目 CRUD 於 HotkeyMapDialog） -->
         <div class="settings-menu__row settings-menu__row--column">
           <span class="settings-menu__label">
-            熱鍵對映表
-            <span class="settings-menu__hint">設定熱鍵輸入模式下的按鍵對映</span>
+            {{ t('hotkey.settingsLabel') }}
+            <span class="settings-menu__hint">{{ t('hotkey.settingsHint') }}</span>
           </span>
           <button type="button" class="settings-menu__link-btn" @click="openHotkeyMap">
-            編輯對映表
+            {{ t('hotkey.settingsEdit') }}
           </button>
         </div>
 
