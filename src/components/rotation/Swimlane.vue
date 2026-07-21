@@ -465,6 +465,7 @@ async function handleDeselectCharacter(): Promise<void> {
               :is-label-highlighted="isLabelHighlighted(entry)"
               :is-editing-dimmed="isEditingDimmed(entry)"
               :is-leaving="rotationStore.isLeaving(entry.id)"
+              :is-entering="hotkeyMode.enteringId.value === entry.id"
               :style="blockStyle(entry.id)"
               role="listitem"
               @select="(event) => handleBlockSelect(entry.id, event)"
@@ -489,9 +490,28 @@ async function handleDeselectCharacter(): Promise<void> {
             <div
               v-if="showGhostCell"
               class="track__ghost-cell"
+              :class="{
+                'track__ghost-cell--pressing': hotkeyMode.pressing.value,
+                'track__ghost-cell--hold': hotkeyMode.holdPreviewLabel.value !== null,
+              }"
               :style="{ gridColumn: String(addButtonColumn + 1) }"
               aria-hidden="true"
-            >⌨</div>
+            >
+              <!-- 長按進度環：按住對映鍵時，環於 300ms 內填滿（＝tap/hold 判定閾值，
+                   見 useHotkeyInputMode 的 HOLD_THRESHOLD_MS）。填滿即代表放開會落「長按」條目。
+                   viewBox 32；r=9 → 週長 2π·9。dashoffset 由滿(空環)動畫到 0(填滿)。 -->
+              <svg class="track__ghost-ring" viewBox="0 0 32 32">
+                <circle class="track__ghost-ring-track" cx="16" cy="16" r="9" />
+                <circle class="track__ghost-ring-fill" cx="16" cy="16" r="9" />
+              </svg>
+              <!-- 中心內容：長按達閾值且有 hold 條目 → 預顯其 label（放開前就知會落哪塊）；
+                   否則顯示鍵盤圖標（按壓中由 CSS 淡出，見 --pressing）。 -->
+              <span
+                v-if="hotkeyMode.holdPreviewLabel.value !== null"
+                class="track__ghost-hold-label"
+              >{{ hotkeyMode.holdPreviewLabel.value }}</span>
+              <span v-else class="track__ghost-icon">⌨</span>
+            </div>
 
             <button
               class="track__add-btn"
@@ -823,6 +843,7 @@ async function handleDeselectCharacter(): Promise<void> {
    與落點空欄同語彙（虛線青框）；grid-row:1 必釘（與隱藏的 ＋ 同欄重疊時
    不被擠到第二列）。pointer-events 穿透（overlay 已接管滑鼠）。 */
 .track__ghost-cell {
+  position: relative; /* 進度環絕對定位鋪滿；圖標居中 */
   grid-row: 1;
   align-self: center;
   display: flex;
@@ -837,6 +858,84 @@ async function handleDeselectCharacter(): Promise<void> {
   font-size: 0.875rem;
   pointer-events: none;
   user-select: none;
+}
+
+/* 中心鍵盤圖標：閒置時提示「這裡是下一塊落點」；按壓中隱藏，改由進度環表示。 */
+.track__ghost-icon {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  transition: opacity 120ms ease;
+}
+.track__ghost-cell--pressing .track__ghost-icon {
+  opacity: 0;
+}
+
+/* 長按預顯 label：達閾值時取代圖標，顯示放開後會落的 hold 條目文字。
+   青色高亮、置於進度環之上；文字過長時不換行（幽靈格為固定正方，容納短招式名足矣）。 */
+.track__ghost-hold-label {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  padding: 0 0.15rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(190, 242, 255, 0.98);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 達閾值時底色略提亮，強化「已進入長按區」的狀態感。 */
+.track__ghost-cell--hold {
+  border-style: solid;
+  background: rgba(34, 211, 238, 0.16);
+}
+
+/* 長按進度環：鋪滿幽靈格；閒置隱藏，按壓中淡入。circle 用 CSS 動畫填 stroke。
+   -90deg 讓起點在 12 點方向、順時針填。 */
+.track__ghost-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.track__ghost-cell--pressing .track__ghost-ring {
+  opacity: 1;
+}
+
+.track__ghost-ring-track {
+  fill: none;
+  stroke: rgba(34, 211, 238, 0.15);
+  stroke-width: 2.5;
+}
+
+/* 進度弧：週長 2π·9 ≈ 56.55。dasharray＝週長，dashoffset 由週長(空)動畫到 0(滿)。
+   動畫時長 300ms 必與 HOLD_THRESHOLD_MS 對齊；linear forwards＝勻速填滿後停在滿環。
+   force-reduce-motion 會把動畫壓成瞬間（環直接滿），仍給得到狀態提示。 */
+.track__ghost-ring-fill {
+  fill: none;
+  stroke: rgba(34, 211, 238, 0.95);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 56.55;
+  stroke-dashoffset: 56.55;
+  filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.7));
+}
+.track__ghost-cell--pressing .track__ghost-ring-fill {
+  animation: ghost-ring-fill 300ms linear forwards;
+}
+
+@keyframes ghost-ring-fill {
+  from {
+    stroke-dashoffset: 56.55;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .track__empty-dropzone {

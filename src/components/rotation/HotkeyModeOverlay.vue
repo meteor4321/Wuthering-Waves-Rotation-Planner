@@ -55,6 +55,12 @@ function _mouseHotkey(event: MouseEvent): string | null {
 // overlay 上按下滑鼠左／右鍵：起按計時（落子留到 mouseup）。
 function handleMouseDown(event: MouseEvent): void {
   if (_fromBar(event)) return
+  // 由暫停恢復：點回軸面覆蓋層的第一擊只作「恢復輸入」，不落子（比照回焦恢復）。
+  // 涵蓋因點擊標題列而暫停（不觸發 window blur/focus）後，點回軸面的恢復路徑。
+  if (hotkeyMode.paused.value) {
+    hotkeyMode.resume()
+    return
+  }
   const hotkey = _mouseHotkey(event)
   if (hotkey && hotkeyMode.pointerDown(hotkey)) event.preventDefault()
 }

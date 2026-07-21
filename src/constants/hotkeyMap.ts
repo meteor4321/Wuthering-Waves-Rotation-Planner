@@ -4,8 +4,9 @@
 // 設計決策（見 DesignDocument/HotkeyInputMode.md §2）：
 //   - 種子由通用區塊 GENERAL_BLOCKS 播種：每個通用招式配一個合理預設物理鍵。
 //     配鍵沿用 Stage 1 寫死方案（label 字母＝同名物理鍵，Intro→S），已與使用者確認。
-//   - 保留鍵禁止綁定：模式已徵用（Esc/1-2-3/Delete/Backspace）、模式進入鍵（F）、
-//     修飾鍵本身（Ctrl/Meta）。錄入 UI 與衝突偵測都以此清單擋下。
+//   - 保留鍵禁止綁定：模式已徵用（Esc/1-2-3/Delete/Backspace）、修飾鍵本身（Ctrl/Meta）。
+//     錄入 UI 與衝突偵測都以此清單擋下。（F 為模式進入鍵但仍可綁定：僅在未進入模式時進入，
+//     進入後 F 走 handleModeKeydown 當一般熱鍵，兩狀態互斥不衝突。）
 //   - 鍵位一律以 event.code 比對；此處另備友善顯示名（設定頁擷取欄用）。
 // ============================================================
 
@@ -36,7 +37,7 @@ export const HOTKEY_SEED_SOURCE: ReadonlyArray<Pick<HotkeyMapEntry, 'label' | 'h
 
 /**
  * 保留鍵（禁止綁定）的 event.code 集合。
- * Escape / Digit1-3 / Delete / Backspace / KeyF（模式進入鍵）／Ctrl・Meta（修飾鍵本身）。
+ * Escape / Digit1-3 / Delete / Backspace / Ctrl・Meta（修飾鍵本身）。
  * 滾輪不是 keydown 事件、無 code，於錄入 UI 另行忽略。
  */
 export const RESERVED_CODES: ReadonlySet<string> = new Set([
@@ -46,7 +47,6 @@ export const RESERVED_CODES: ReadonlySet<string> = new Set([
   'Digit3',
   'Delete',
   'Backspace',
-  'KeyF',
   'ControlLeft',
   'ControlRight',
   'MetaLeft',

@@ -36,6 +36,20 @@ const HOLD_THRESHOLD_MS = 300;
 // 模組層級共用：鍵盤 keydown/keyup 走 useKeyboardShortcuts、滑鼠走 overlay，
 // 兩路各自 useHotkeyInputMode() 但共享此表，落子一律在 keyup/mouseup 判型別後。
 const _pressStartAt = new Map<string, number>();
+// 目前正被按住、且有對映的鍵位（同時只驅動一枚幽靈格長按進度動畫）。
+// 為 null＝無按壓（幽靈格顯示鍵盤圖標）；非 null＝按壓中（顯示徑向進度環，見 §3.3 Stage 3-2）。
+const _pressingHotkey = ref<string | null>(null);
+// 長按即時預顯（§3.3）：按住超過閾值且該鍵有 hold 條目時，填入其 label，
+// 讓使用者在放開前就知道會落哪一塊。為 null＝未達閾值或該鍵無 hold 條目。
+const _holdPreviewLabel = ref<string | null>(null);
+// 達閾值計時器 id（跨鍵盤／滑鼠共用單一計時器；起按設、放開／暫停／退出清）。
+let _holdTimer: number | null = null;
+// 剛以熱鍵插入的區塊 id：驅動 RotationBlock 播一次「落下吸附」進場動畫（§3.2）。
+// 動畫播畢即清（一次性）；下次插入覆蓋為新 id。
+const _enteringId = ref<string | null>(null);
+let _enterTimer: number | null = null;
+// 進場動畫時長（與 RotationBlock 的 block-enter keyframes 對齊；含保險餘裕）。
+const ENTER_ANIM_MS = 260;
 // 側欄收合的欄寬過渡時長（AppLayout transition 0.25s）：進場置中捲動須等
 // 版面定型後再算，否則以過渡中的寬度計算會偏。
 const SIDEBAR_TRANSITION_MS = 300;
@@ -95,6 +109,8 @@ export function useHotkeyInputMode() {
     active.value = false;
     paused.value = false;
     _pressStartAt.clear(); // 清掉未放開的按壓，避免下次進入誤判
+    _pressingHotkey.value = null;
+    _clearHoldPreview();
     rotationStore.selectLane(null);
     sidebarCollapse.collapsed.value = _sidebarWasCollapsed;
   }
@@ -122,14 +138,16 @@ export function useHotkeyInputMode() {
     if (lane === null) return;
     const character = characterStore.slots[lane].character;
     if (!character) return;
-    // addFreeformBlock 自帶 history.record() → 一鍵一步 undo。
-    rotationStore.addFreeformBlock(
+    // addFreeformBlock 自帶 history.record() → 一鍵一步 undo；回傳新區塊 id。
+    const newId = rotationStore.addFreeformBlock(
       entry.label,
       getElementColor(character.element),
       lane,
       character.id,
       rotationStore.entries.length - 1,
     );
+    // 標記剛插入的區塊 → RotationBlock 播一次落下吸附進場動畫（一次性，播畢即清）。
+    _markEntering(newId);
     // 自動跟隨：每次插入後把「下一個落點」（幽靈格）置中於可視軌道區。
     centerGhostCell();
   }
@@ -142,8 +160,37 @@ export function useHotkeyInputMode() {
   function beginPress(hotkey: string): boolean {
     if (paused.value) return false;
     if (!hotkeyMap.hasHotkey(hotkey)) return false;
-    if (!_pressStartAt.has(hotkey)) _pressStartAt.set(hotkey, performance.now());
+    if (!_pressStartAt.has(hotkey)) {
+      _pressStartAt.set(hotkey, performance.now());
+      // 新一輪按壓起始：驅動幽靈格徑向進度環從 0 開始填（作業系統自動重複不覆蓋）。
+      _pressingHotkey.value = hotkey;
+      _scheduleHoldPreview(hotkey);
+    }
     return true;
+  }
+
+  /** 排程長按即時預顯：達閾值時若該鍵有非空 hold 條目，把其 label 顯示於幽靈格。 */
+  function _scheduleHoldPreview(hotkey: string): void {
+    _clearHoldPreview();
+    _holdTimer = window.setTimeout(() => {
+      _holdTimer = null;
+      if (_pressingHotkey.value !== hotkey) return; // 已放開／換鍵
+      // 僅在「真的有 hold 條目」時預顯：resolveByCodeAndPress('hold') 會對只有 tap 的鍵
+      // 退回 tap（§3.3 寬容），那種情況放開仍落 tap、無別的東西可預顯，故排除。
+      const entry = hotkeyMap.resolveByCodeAndPress(hotkey, 'hold');
+      if (entry && entry.pressType === 'hold' && entry.label.trim() !== '') {
+        _holdPreviewLabel.value = entry.label;
+      }
+    }, HOLD_THRESHOLD_MS);
+  }
+
+  /** 清掉長按預顯（計時器＋已顯示的 label）。放開／暫停／退出／換鍵時呼叫。 */
+  function _clearHoldPreview(): void {
+    if (_holdTimer !== null) {
+      clearTimeout(_holdTimer);
+      _holdTimer = null;
+    }
+    _holdPreviewLabel.value = null;
   }
 
   /**
@@ -154,12 +201,27 @@ export function useHotkeyInputMode() {
     const start = _pressStartAt.get(hotkey);
     if (start === undefined) return false;
     _pressStartAt.delete(hotkey);
+    if (_pressingHotkey.value === hotkey) {
+      _pressingHotkey.value = null; // 放開＝停止進度環
+      _clearHoldPreview();
+    }
+
     if (paused.value) return false;
     const pressType: PressType = performance.now() - start >= HOLD_THRESHOLD_MS ? 'hold' : 'tap';
     const entry = hotkeyMap.resolveByCodeAndPress(hotkey, pressType);
     if (!entry) return false;
     insertEntry(entry);
     return true;
+  }
+
+  /** 標記剛插入的區塊為「進場中」，排程於動畫時長後清除（一次性）。 */
+  function _markEntering(id: string): void {
+    if (_enterTimer !== null) clearTimeout(_enterTimer);
+    _enteringId.value = id;
+    _enterTimer = window.setTimeout(() => {
+      _enterTimer = null;
+      if (_enteringId.value === id) _enteringId.value = null;
+    }, ENTER_ANIM_MS);
   }
 
   /** 刪除選中泳道的最後一個區塊（依 slotIndex 過濾後的最後一項）。 */
@@ -216,6 +278,12 @@ export function useHotkeyInputMode() {
       return;
     }
 
+    // Tab：模式中攔下瀏覽器原生焦點切換（模式為 modal，不讓焦點跳離軸面）。
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      return;
+    }
+
     // 長按不連發：忽略作業系統的鍵盤自動重複。
     if (event.repeat) return;
     if (event.altKey) return;
@@ -243,6 +311,8 @@ export function useHotkeyInputMode() {
   function pause(): void {
     paused.value = true;
     _pressStartAt.clear();
+    _pressingHotkey.value = null; // 失焦暫停：停止進度環，避免回焦時殘留
+    _clearHoldPreview();
   }
 
   /** 回焦恢復接收輸入。 */
@@ -250,9 +320,19 @@ export function useHotkeyInputMode() {
     paused.value = false;
   }
 
+  // 幽靈格是否顯示長按進度環（有對映鍵正被按住）。驅動 Swimlane 徑向進度動畫。
+  const pressing = computed<boolean>(() => _pressingHotkey.value !== null);
+  // 長按即時預顯的 label（達閾值且有 hold 條目才非空）。驅動 Swimlane 幽靈格文字。
+  const holdPreviewLabel = computed<string | null>(() => _holdPreviewLabel.value);
+  // 剛以熱鍵插入的區塊 id（進場動畫用；播畢為 null）。驅動 RotationBlock 落下吸附。
+  const enteringId = computed<string | null>(() => _enteringId.value);
+
   return {
     active,
     paused,
+    pressing,
+    holdPreviewLabel,
+    enteringId,
     selectableLanes,
     enter,
     exit,

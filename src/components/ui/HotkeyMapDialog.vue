@@ -122,8 +122,8 @@ function onLabelInput(id: string, event: Event): void {
 
 async function handleReset(): Promise<void> {
   const ok = await dialog.confirm({
-    title: '還原預設對映',
-    message: '將對映表還原為預設種子，你目前的自訂會全部消失。確定嗎？',
+    title: '還原預設',
+    message: '當前的自訂熱鍵會被全部還原。確定嗎？',
     confirmText: '還原',
     cancelText: '取消',
     danger: true,
@@ -159,7 +159,7 @@ onUnmounted(stopCapture)
         >
           <h2 class="hkmap-dialog__title">熱鍵對映表</h2>
           <p class="hkmap-dialog__desc">
-            進入熱鍵輸入模式（<kbd>F</kbd>）後，按下這裡設定的鍵，即在選中泳道末尾插入對應區塊。
+            進入熱鍵輸入模式（<kbd>F</kbd>）後，按下這裡設定的鍵，即可在角色軸末端插入對應區塊。
           </p>
 
           <!-- 表頭 -->
