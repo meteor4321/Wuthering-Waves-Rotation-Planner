@@ -7,7 +7,7 @@
 //     不需處理模板刪改的懸空引用。
 //   - 鍵位比對用 event.code（物理鍵），免疫 CapsLock 與輸入法。
 //   - 泳道選中直接重用 rotationStore.selectedLaneIndex（沿用青色焦點環視覺）。
-//   - Stage 1 對映表暫時寫死（Stage 2 改讀設定 store）。
+//   - 對映表改讀 useHotkeyMap（Stage 2：設定頁可編輯、LocalStorage 持久化）。
 //   - 模式中既有快捷鍵全數停用：useKeyboardShortcuts 分派器見 active 即短路
 //     改呼叫 handleModeKeydown。
 // ============================================================
@@ -19,19 +19,9 @@ import { useLaneOrder } from '@/composables/state/useLaneOrder';
 import { useHistory } from '@/composables/state/useHistory';
 import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse';
 import { useBoardScroll } from '@/composables/board/useBoardScroll';
+import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
 import { getElementColor } from '@/constants/elements';
 import type { SlotIndex } from '@/types/character';
-
-/** Stage 1 暫時寫死的對映表：event.code → 插入的區塊文字（Stage 2 改讀設定）。 */
-const STAGE1_HOTKEY_MAP: ReadonlyArray<{ code: string; label: string }> = [
-  { code: 'KeyA', label: 'A' },
-  { code: 'KeyZ', label: 'Z' },
-  { code: 'KeyE', label: 'E' },
-  { code: 'KeyR', label: 'R' },
-  { code: 'KeyQ', label: 'Q' },
-  { code: 'KeyD', label: 'D' },
-  { code: 'KeyS', label: 'Intro' },
-];
 
 // 模組層級單例：模式開關（整個 App 共用同一份）。
 const active = ref(false);
@@ -48,6 +38,7 @@ export function useHotkeyInputMode() {
   const { laneOrder } = useLaneOrder();
   const sidebarCollapse = useSidebarCollapse();
   const { scrollSelectorIntoView } = useBoardScroll();
+  const hotkeyMap = useHotkeyMap();
 
   /** 可選中的泳道（已選角），依畫面上下顯示順序排列。 */
   const selectableLanes = computed<SlotIndex[]>(() =>
@@ -116,8 +107,8 @@ export function useHotkeyInputMode() {
 
   /** 依對映表插入區塊至選中泳道（＝1D 陣列末尾）；命中回 true。 */
   function insertByCode(code: string): boolean {
-    const entry = STAGE1_HOTKEY_MAP.find((m) => m.code === code);
-    if (!entry || entry.label.trim() === '') return false;
+    const entry = hotkeyMap.resolveByCode(code);
+    if (!entry) return false;
     const lane = rotationStore.selectedLaneIndex;
     if (lane === null) return false;
     const character = characterStore.slots[lane].character;
