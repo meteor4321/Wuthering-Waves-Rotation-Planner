@@ -438,14 +438,23 @@ export function useKeyboardShortcuts() {
   // 生命週期掛載
   // ──────────────────────────────────────────
 
+  /** keyup 分派器：僅熱鍵輸入模式需要（tap/hold 於放開時落子，見 §3.3）。 */
+  function _handleKeyup(event: KeyboardEvent): void {
+    if (!hotkeyMode.active.value) return;
+    if (_shouldIgnore(event)) return;
+    hotkeyMode.handleModeKeyup(event);
+  }
+
   onMounted(() => {
     // 掛載到 window（而非 document），確保在所有場景下都能接收到事件
     window.addEventListener('keydown', _handleKeydown);
+    window.addEventListener('keyup', _handleKeyup);
   });
 
   onUnmounted(() => {
     // 元件卸除時移除監聽器，防止記憶體洩漏
     window.removeEventListener('keydown', _handleKeydown);
+    window.removeEventListener('keyup', _handleKeyup);
   });
 
   // 副作用全透過 store 反映，回傳空物件僅為呼叫端語意清晰。

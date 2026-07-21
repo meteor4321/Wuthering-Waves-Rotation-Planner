@@ -11,10 +11,12 @@
 //   - 錄入時擋保留鍵（RESERVED_CODES）、即時偵測衝突（同 hotkey + pressType）。
 //
 // 設計決策：
-//   - 擷取以 window capture-phase 一次性監聽 keydown，stopImmediatePropagation
-//     擋住全域快捷鍵（否則錄入時按下的鍵會誤觸 App 快捷鍵，如 F 進入熱鍵模式）。
+//   - 擷取以 window capture-phase 一次性監聽 keydown＋mousedown，
+//     stopImmediatePropagation 擋住全域快捷鍵（否則錄入時按下的鍵會誤觸 App
+//     快捷鍵，如 F 進入熱鍵模式）；contextmenu 一併攔下避免右鍵彈選單。
 //   - 鍵位比對用 event.code；顯示走 formatHotkey。
-//   - 滑鼠鍵擷取（MouseLeft/Right）與其模式輸入一起留待 Stage 3；此處僅鍵盤。
+//   - 滑鼠鍵擷取（Stage 3）：擷取中按滑鼠左／右鍵即錄入 MouseLeft／MouseRight。
+//     取消擷取改按 Escape（擷取中的左鍵點擊會被當成 MouseLeft 錄入）。
 //   - 衝突＝同鍵同 pressType 的既有條目：以 dialog.confirm 詢問「覆蓋」
 //     （新條目取得該鍵、原持有者清空鍵位）或「取消」（不變更）。
 //   - 介面字串暫以繁中字面量（沿用 Stage 1 慣例，Stage 4 統一進 i18n）。
@@ -24,11 +26,11 @@ import { ref, onUnmounted } from 'vue'
 import { useHotkeyMapDialog } from '@/composables/state/useHotkeyMapDialog'
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap'
 import { useDialog } from '@/composables/state/useDialog'
-import { RESERVED_CODES, formatHotkey } from '@/constants/hotkeyMap'
+import { RESERVED_CODES, formatHotkey, MOUSE_LEFT, MOUSE_RIGHT } from '@/constants/hotkeyMap'
 import type { PressType } from '@/types/hotkey'
 
 const { isOpen, close } = useHotkeyMapDialog()
-const { entries, addEntry, updateEntry, removeEntry, resetToDefaults, findConflict } = useHotkeyMap()
+const { entries, conflictIds, hasConflict, addEntry, updateEntry, removeEntry, resetToDefaults } = useHotkeyMap()
 const dialog = useDialog()
 
 // 正在擷取鍵位的條目 id（null＝無）。
@@ -36,29 +38,36 @@ const capturingId = ref<string | null>(null)
 // 擷取時的即時錯誤提示（保留鍵）；切換條目或成功即清除。
 const captureError = ref<string>('')
 
-/** 開始擷取某條目的鍵位：掛一次性 window capture-phase 監聽。 */
+/** 該列要顯示在擷取欄左側的紅色警語：僅「正在擷取且錄到保留鍵」時出現（類型二）。
+ *  重複鍵位（類型一）不走這裡，只靠擷取欄本身的紅框樣式 + 完成鈕旁單一訊息。 */
+function reservedWarnFor(id: string): string {
+  return capturingId.value === id ? captureError.value : ''
+}
+
+/** 開始擷取某條目的鍵位：掛 window capture-phase 監聽（鍵盤＋滑鼠左鍵 click＋右鍵 contextmenu）。 */
 function startCapture(id: string): void {
   if (capturingId.value !== null) stopCapture()
   capturingId.value = id
   captureError.value = ''
   window.addEventListener('keydown', onCaptureKeydown, { capture: true })
+  window.addEventListener('click', onCaptureClick, { capture: true })
+  window.addEventListener('contextmenu', onCaptureContextMenu, { capture: true })
 }
 
 /** 結束擷取：解除監聽、清狀態。 */
 function stopCapture(): void {
   window.removeEventListener('keydown', onCaptureKeydown, { capture: true })
+  window.removeEventListener('click', onCaptureClick, { capture: true })
+  window.removeEventListener('contextmenu', onCaptureContextMenu, { capture: true })
   capturingId.value = null
   captureError.value = ''
 }
 
-/** 擷取中的 keydown：讀 event.code，擋保留鍵、偵測衝突後寫入。 */
-async function onCaptureKeydown(event: KeyboardEvent): Promise<void> {
+/** 擷取中的 keydown：讀 event.code，擋保留鍵（顯示左側警語）、其餘寫入。 */
+function onCaptureKeydown(event: KeyboardEvent): void {
   // 擋住全域快捷鍵與瀏覽器預設（錄入期間按鍵只作錄入用途）。
   event.preventDefault()
   event.stopImmediatePropagation()
-
-  const id = capturingId.value
-  if (id === null) return
 
   // Escape：取消擷取（Escape 本為保留鍵，一律當退出錄入）。
   if (event.code === 'Escape') {
@@ -71,32 +80,33 @@ async function onCaptureKeydown(event: KeyboardEvent): Promise<void> {
     return
   }
 
-  const entry = entries.value.find((e) => e.id === id)
-  if (!entry) {
-    stopCapture()
-    return
-  }
+  applyCapture(event.code)
+}
 
-  // 衝突偵測：同鍵同 pressType 的既有條目。
-  const conflict = findConflict(event.code, entry.pressType, id)
-  if (conflict) {
-    // 先解除擷取監聽再問（confirm 期間不再吃鍵）。
-    stopCapture()
-    const ok = await dialog.confirm({
-      title: '鍵位衝突',
-      message: `「${formatHotkey(event.code)}」已綁定給「${conflict.label || '（未命名）'}」。`
-        + '要改綁到這一條嗎？原條目的鍵位會被清空。',
-      confirmText: '覆蓋',
-      cancelText: '取消',
-    })
-    if (ok) {
-      updateEntry(conflict.id, { hotkey: '' })
-      updateEntry(id, { hotkey: event.code })
-    }
-    return
-  }
+/**
+ * 擷取中的 click（capture-phase）：左鍵錄入 MouseLeft。
+ * 用 click（手勢終端事件）而非 mousedown → 當場 stopImmediatePropagation 即不外洩,
+ * 不需再「吞下一次 click」（避免誤吞使用者後續的正常點擊）。
+ */
+function onCaptureClick(event: MouseEvent): void {
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  if (event.button !== 0) return
+  applyCapture(MOUSE_LEFT)
+}
 
-  updateEntry(id, { hotkey: event.code })
+/** 擷取中的 contextmenu：錄入 MouseRight 並攔下右鍵選單（右鍵不會派送 click,故在此收）。 */
+function onCaptureContextMenu(event: MouseEvent): void {
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  applyCapture(MOUSE_RIGHT)
+}
+
+/** 把擷取到的鍵位寫入目前條目並結束擷取（重複鍵位改由設定頁就地紅字處理,不在此擋）。 */
+function applyCapture(hotkey: string): void {
+  const id = capturingId.value
+  if (id === null) return
+  updateEntry(id, { hotkey })
   stopCapture()
 }
 
@@ -121,6 +131,12 @@ async function handleReset(): Promise<void> {
   if (ok) resetToDefaults()
 }
 
+/** 點背景關閉：擷取中不關閉（此時任何點擊都作錄入用途，見 spotlight）。 */
+function onBackdropClick(): void {
+  if (capturingId.value !== null) return
+  handleClose()
+}
+
 /** 關閉視窗：一併結束擷取。 */
 function handleClose(): void {
   stopCapture()
@@ -133,7 +149,7 @@ onUnmounted(stopCapture)
 <template>
   <Teleport to="body">
     <Transition name="hkmap-map">
-      <div v-if="isOpen" class="hkmap-overlay" @click.self="handleClose">
+      <div v-if="isOpen" class="hkmap-overlay" @click.self="onBackdropClick">
         <div
           class="hkmap-dialog"
           role="dialog"
@@ -167,17 +183,25 @@ onUnmounted(stopCapture)
                 @input="onLabelInput(entry.id, $event)"
               />
 
-              <!-- 按鍵擷取欄 -->
-              <button
-                type="button"
-                class="hkmap-col hkmap-col--key hkmap-capture"
-                :class="{ 'hkmap-capture--active': capturingId === entry.id }"
-                @click="capturingId === entry.id ? stopCapture() : startCapture(entry.id)"
-              >
-                <template v-if="capturingId === entry.id">按下任意鍵…</template>
-                <template v-else-if="entry.hotkey">{{ formatHotkey(entry.hotkey) }}</template>
-                <template v-else>未設定</template>
-              </button>
+              <!-- 按鍵擷取欄（wrapper：容納「左側」保留鍵警語，相對擷取欄定位） -->
+              <div class="hkmap-col hkmap-col--key hkmap-keywrap">
+                <span v-if="reservedWarnFor(entry.id)" class="hkmap-key-warn">
+                  {{ reservedWarnFor(entry.id) }}
+                </span>
+                <button
+                  type="button"
+                  class="hkmap-capture"
+                  :class="{
+                    'hkmap-capture--active': capturingId === entry.id,
+                    'hkmap-capture--conflict': conflictIds.has(entry.id),
+                  }"
+                  @click="capturingId === entry.id ? stopCapture() : startCapture(entry.id)"
+                >
+                  <template v-if="capturingId === entry.id">按下任意鍵</template>
+                  <template v-else-if="entry.hotkey">{{ formatHotkey(entry.hotkey) }}</template>
+                  <template v-else>未設定</template>
+                </button>
+              </div>
 
               <!-- pressType 切換 -->
               <div class="hkmap-col hkmap-col--press hkmap-press">
@@ -206,16 +230,30 @@ onUnmounted(stopCapture)
             </li>
           </ul>
 
-          <!-- 擷取錯誤（保留鍵） -->
-          <p v-if="captureError" class="hkmap-dialog__error">{{ captureError }}</p>
-
           <!-- 底部動作 -->
           <div class="hkmap-dialog__actions">
             <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="addEntry()">＋ 新增條目</button>
             <button type="button" class="hkmap-btn hkmap-btn--ghost" @click="handleReset">還原預設</button>
             <span class="hkmap-dialog__spacer" />
-            <button type="button" class="hkmap-btn hkmap-btn--confirm" @click="handleClose">完成</button>
+            <!-- 類型一：重複鍵位 → 完成鈕左側單一警語 + 停用完成 -->
+            <span v-if="hasConflict" class="hkmap-dialog__conflict">偵測到重複的熱鍵鍵位</span>
+            <button
+              type="button"
+              class="hkmap-btn hkmap-btn--confirm"
+              :disabled="hasConflict"
+              @click="handleClose"
+            >完成</button>
           </div>
+
+          <!-- 錄入聚光燈：擷取中壓暗整個視窗、只讓作用中的擷取欄透出，
+               並鎖住其餘互動（實際攔截由 window capture-phase 監聽負責）。
+               提示膠囊抽為 spotlight 的兄弟節點,z-index 高於作用欄 → 不被抬起的欄蓋住。 -->
+          <template v-if="capturingId !== null">
+            <div class="hkmap-spotlight" aria-hidden="true"></div>
+            <div class="hkmap-spotlight__hint" aria-hidden="true">
+              正在錄入鍵位...按任意鍵綁定，<kbd>Esc</kbd> 取消
+            </div>
+          </template>
         </div>
       </div>
     </Transition>
@@ -236,6 +274,7 @@ onUnmounted(stopCapture)
 }
 
 .hkmap-dialog {
+  position: relative; /* 聚光燈（.hkmap-spotlight）與透出的擷取欄以此為定位／堆疊基準 */
   width: min(34rem, 100%);
   max-height: calc(100vh - 3rem);
   overflow-y: auto;
@@ -337,10 +376,49 @@ onUnmounted(stopCapture)
   border-color: rgba(34, 211, 238, 0.7);
 }
 .hkmap-capture--active {
+  /* 錄入中：抬到聚光燈之上（z-index 6 > .hkmap-spotlight 的 5）並發光，
+     成為畫面上唯一透出、聚焦的欄位。
+     pointer-events:none → 點作用欄本身不觸發 @click（不會關掉錄入）,點擊穿透到
+     聚光燈層,由 window capture-phase click 收成 MouseLeft；取消改按 Esc（問題 3）。 */
+  position: relative;
+  z-index: 6;
+  pointer-events: none;
   border-style: solid;
-  border-color: rgba(34, 211, 238, 0.8);
+  border-color: rgba(34, 211, 238, 0.9);
   color: rgba(34, 211, 238, 0.95);
-  background: rgba(34, 211, 238, 0.08);
+  background: #0d1320;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.55), 0 0 16px rgba(34, 211, 238, 0.45);
+}
+
+/* 重複鍵位衝突（類型一）：擷取欄轉紅警示；文字警語不在此,改置於完成鈕左側。 */
+.hkmap-capture--conflict {
+  border-style: solid;
+  border-color: rgba(248, 113, 113, 0.85);
+  color: rgba(248, 113, 113, 0.95);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+/* 擷取欄外層：容納「左側」保留鍵警語（絕對定位,不擠動 grid 欄寬）。 */
+.hkmap-keywrap {
+  position: relative;
+}
+.hkmap-keywrap .hkmap-capture {
+  width: 100%;
+}
+
+/* 保留鍵警語（類型二）：貼在擷取欄左側,相對其位置；z-index 6 > 聚光燈 5,錄入壓暗時仍清楚。 */
+.hkmap-key-warn {
+  position: absolute;
+  right: calc(100% + 0.4rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  text-align: right;
+  color: rgba(248, 113, 113, 0.92);
+  pointer-events: none;
 }
 
 .hkmap-press {
@@ -386,8 +464,8 @@ onUnmounted(stopCapture)
   color: rgba(248, 113, 113, 0.95);
 }
 
-.hkmap-dialog__error {
-  margin: 0.5rem 0 0;
+/* 類型一重複鍵位：完成鈕左側的單一警語。 */
+.hkmap-dialog__conflict {
   font-size: 0.7rem;
   color: rgba(248, 113, 113, 0.9);
 }
@@ -428,6 +506,48 @@ onUnmounted(stopCapture)
 }
 .hkmap-btn--confirm:hover {
   background: rgba(34, 211, 238, 0.28);
+}
+/* 有重複鍵位衝突時停用完成鈕（灰、不可點）。 */
+.hkmap-btn--confirm:disabled {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(240, 244, 248, 0.35);
+  cursor: not-allowed;
+}
+
+/* 錄入聚光燈：覆蓋整個對映視窗、壓暗背景並吞下互動（作用中的擷取欄 z-index 高於此透出）。
+   實際的鍵位／點擊攔截仍由 window capture-phase 監聽負責；此層純為視覺與保險用的點擊屏障。 */
+.hkmap-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 8px;
+  background: rgba(3, 6, 12, 0.66);
+  backdrop-filter: blur(1px);
+}
+/* 提示膠囊：z-index 7 > 作用欄 6 → 抬起的擷取欄不會蓋住它（問題 4）。 */
+.hkmap-spotlight__hint {
+  position: absolute;
+  left: 50%;
+  bottom: 3.75rem;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  border-radius: 999px;
+  background: rgba(13, 19, 32, 0.95);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  font-size: 0.72rem;
+  color: rgba(34, 211, 238, 0.95);
+  white-space: nowrap;
+}
+.hkmap-spotlight__hint kbd {
+  padding: 0 0.3em;
+  font-size: 0.65rem;
+  color: rgba(240, 244, 248, 0.9);
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 3px;
 }
 
 /* 進出場：只動 opacity（沿用專案慣例，避免 transform 與其他層互動）。 */

@@ -22,11 +22,20 @@ import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
 import { getElementColor } from '@/constants/elements';
 import type { SlotIndex } from '@/types/character';
+import type { HotkeyMapEntry, PressType } from '@/types/hotkey';
 
 // 模組層級單例：模式開關（整個 App 共用同一份）。
 const active = ref(false);
+// 暫停接收輸入（視窗 blur／滑鼠移出視窗）：不退出模式，回焦即恢復（§3.1）。
+const paused = ref(false);
 // 進入模式前側邊欄是否已收合：退出時據此還原（模式自動收合側欄爭取軸面寬度）。
 let _sidebarWasCollapsed = false;
+// 單擊／長按閾值：keydown 起計、keyup 依按住時長判定（§3.3，寫死不設定）。
+const HOLD_THRESHOLD_MS = 300;
+// 進行中的按壓：鍵位（event.code 或 MouseLeft/Right）→ 起按時刻（performance.now）。
+// 模組層級共用：鍵盤 keydown/keyup 走 useKeyboardShortcuts、滑鼠走 overlay，
+// 兩路各自 useHotkeyInputMode() 但共享此表，落子一律在 keyup/mouseup 判型別後。
+const _pressStartAt = new Map<string, number>();
 // 側欄收合的欄寬過渡時長（AppLayout transition 0.25s）：進場置中捲動須等
 // 版面定型後再算，否則以過渡中的寬度計算會偏。
 const SIDEBAR_TRANSITION_MS = 300;
@@ -84,6 +93,8 @@ export function useHotkeyInputMode() {
   function exit(): void {
     if (!active.value) return;
     active.value = false;
+    paused.value = false;
+    _pressStartAt.clear(); // 清掉未放開的按壓，避免下次進入誤判
     rotationStore.selectLane(null);
     sidebarCollapse.collapsed.value = _sidebarWasCollapsed;
   }
@@ -105,14 +116,12 @@ export function useHotkeyInputMode() {
     rotationStore.selectLane(lanes[next]);
   }
 
-  /** 依對映表插入區塊至選中泳道（＝1D 陣列末尾）；命中回 true。 */
-  function insertByCode(code: string): boolean {
-    const entry = hotkeyMap.resolveByCode(code);
-    if (!entry) return false;
+  /** 把一條對映條目插入選中泳道末尾（＝1D 陣列末尾）。 */
+  function insertEntry(entry: HotkeyMapEntry): void {
     const lane = rotationStore.selectedLaneIndex;
-    if (lane === null) return false;
+    if (lane === null) return;
     const character = characterStore.slots[lane].character;
-    if (!character) return false;
+    if (!character) return;
     // addFreeformBlock 自帶 history.record() → 一鍵一步 undo。
     rotationStore.addFreeformBlock(
       entry.label,
@@ -123,6 +132,33 @@ export function useHotkeyInputMode() {
     );
     // 自動跟隨：每次插入後把「下一個落點」（幽靈格）置中於可視軌道區。
     centerGhostCell();
+  }
+
+  /**
+   * 起按：記錄該鍵位的起按時刻（keydown／mousedown 共用）。
+   * 回 true＝此鍵位有對映（呼叫端據此 preventDefault）。暫停中或無對映不記。
+   * 已在按住（含作業系統自動重複）則不覆蓋起按時刻。
+   */
+  function beginPress(hotkey: string): boolean {
+    if (paused.value) return false;
+    if (!hotkeyMap.hasHotkey(hotkey)) return false;
+    if (!_pressStartAt.has(hotkey)) _pressStartAt.set(hotkey, performance.now());
+    return true;
+  }
+
+  /**
+   * 放開：依按住時長判 tap/hold，解析對映條目後落子（keyup／mouseup 共用）。
+   * 回 true＝有落子（呼叫端據此 preventDefault）。無對應起按或暫停中則不動作。
+   */
+  function endPress(hotkey: string): boolean {
+    const start = _pressStartAt.get(hotkey);
+    if (start === undefined) return false;
+    _pressStartAt.delete(hotkey);
+    if (paused.value) return false;
+    const pressType: PressType = performance.now() - start >= HOLD_THRESHOLD_MS ? 'hold' : 'tap';
+    const entry = hotkeyMap.resolveByCodeAndPress(hotkey, pressType);
+    if (!entry) return false;
+    insertEntry(entry);
     return true;
   }
 
@@ -184,15 +220,48 @@ export function useHotkeyInputMode() {
     if (event.repeat) return;
     if (event.altKey) return;
 
-    if (insertByCode(event.code)) event.preventDefault();
+    // 對映鍵：起按只計時，落子留到 keyup（才知 tap／hold，見 §3.3）。
+    if (beginPress(event.code)) event.preventDefault();
+  }
+
+  /** 模式中的 keyup 分派（由 useKeyboardShortcuts 短路轉呼叫）：對映鍵放開時落子。 */
+  function handleModeKeyup(event: KeyboardEvent): void {
+    if (endPress(event.code)) event.preventDefault();
+  }
+
+  /** 滑鼠鍵起按（MouseLeft／MouseRight）：由 overlay mousedown 轉呼叫。 */
+  function pointerDown(hotkey: string): boolean {
+    return beginPress(hotkey);
+  }
+
+  /** 滑鼠鍵放開：由 overlay mouseup 轉呼叫；回 true＝有落子。 */
+  function pointerUp(hotkey: string): boolean {
+    return endPress(hotkey);
+  }
+
+  /** 暫停接收輸入（視窗 blur／滑鼠移出視窗）：清掉未放開的按壓避免回焦誤觸。 */
+  function pause(): void {
+    paused.value = true;
+    _pressStartAt.clear();
+  }
+
+  /** 回焦恢復接收輸入。 */
+  function resume(): void {
+    paused.value = false;
   }
 
   return {
     active,
+    paused,
     selectableLanes,
     enter,
     exit,
     cycleLane,
     handleModeKeydown,
+    handleModeKeyup,
+    pointerDown,
+    pointerUp,
+    pause,
+    resume,
   };
 }

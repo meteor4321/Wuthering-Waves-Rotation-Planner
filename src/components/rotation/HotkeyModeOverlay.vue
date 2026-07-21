@@ -3,11 +3,14 @@
 // HotkeyModeOverlay.vue — 熱鍵輸入模式的覆蓋層＋控制列。
 //
 // 職責：標示模式進行中（青色邊框光暈）、提供退出鈕與當前泳道指示、
-//       徵用滾輪切換泳道。僅在模式 active 時由 RotationBoard 掛載。
+//       徵用滾輪切換泳道、承接滑鼠左／右鍵輸入。僅在模式 active 時掛載。
 // 設計決策：
-//   - overlay 攔下滑鼠點擊（模式為 modal；Stage 3 起點擊改作輸入訊號）。
+//   - overlay 攔下滑鼠點擊作輸入訊號（模式為 modal；控制列除外，見 _fromBar）。
+//     左／右鍵於 mousedown 起按、mouseup 落子（與鍵盤同走 tap/hold 判定），
+//     並攔截 contextmenu 避免右鍵彈選單（§3.2）。
 //   - 滾輪掛 window 且 passive:false（需 preventDefault 攔下主軸捲動），
 //     元件卸載即解除 → 模式外滾輪行為不受影響。
+//   - 視窗 blur／focus：暫停／恢復接收輸入（不退出模式，§3.1）。
 //   - 切換輸出軸分頁＝視同退出模式（watch activeAxisId）。
 //   - Stage 1 介面字串暫以繁中字面量，Stage 4 統一進 i18n。
 // ============================================================
@@ -16,6 +19,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRotationStore } from '@/stores/useRotationStore'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode'
+import { MOUSE_LEFT, MOUSE_RIGHT } from '@/constants/hotkeyMap'
 import { characterDisplayName } from '@/i18n'
 
 const rotationStore = useRotationStore()
@@ -36,18 +40,60 @@ function handleWheel(event: WheelEvent): void {
   hotkeyMode.cycleLane(event.deltaY > 0 ? 1 : -1)
 }
 
-onMounted(() => window.addEventListener('wheel', handleWheel, { passive: false }))
-onUnmounted(() => window.removeEventListener('wheel', handleWheel))
+// 事件是否來自控制列（退出鈕等）：控制列的點擊不作輸入訊號（§3.1）。
+function _fromBar(event: MouseEvent): boolean {
+  return (event.target as HTMLElement).closest('.hotkey-overlay__bar') !== null
+}
+
+// 滑鼠鍵 → 對映鍵位保留字；非左右鍵回 null。
+function _mouseHotkey(event: MouseEvent): string | null {
+  if (event.button === 0) return MOUSE_LEFT
+  if (event.button === 2) return MOUSE_RIGHT
+  return null
+}
+
+// overlay 上按下滑鼠左／右鍵：起按計時（落子留到 mouseup）。
+function handleMouseDown(event: MouseEvent): void {
+  if (_fromBar(event)) return
+  const hotkey = _mouseHotkey(event)
+  if (hotkey && hotkeyMode.pointerDown(hotkey)) event.preventDefault()
+}
+
+// overlay 上放開滑鼠左／右鍵：依按住時長落子。
+function handleMouseUp(event: MouseEvent): void {
+  if (_fromBar(event)) return
+  const hotkey = _mouseHotkey(event)
+  if (hotkey && hotkeyMode.pointerUp(hotkey)) event.preventDefault()
+}
+
+onMounted(() => {
+  window.addEventListener('wheel', handleWheel, { passive: false })
+  // blur/focus：切出視窗暫停接收輸入，回焦恢復（避免 alt-tab 回來誤觸發）。
+  window.addEventListener('blur', hotkeyMode.pause)
+  window.addEventListener('focus', hotkeyMode.resume)
+})
+onUnmounted(() => {
+  window.removeEventListener('wheel', handleWheel)
+  window.removeEventListener('blur', hotkeyMode.pause)
+  window.removeEventListener('focus', hotkeyMode.resume)
+})
 
 // 切換輸出軸分頁 = 視同退出模式。
 watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
 </script>
 
 <template>
-  <div class="hotkey-overlay" @click.stop>
+  <div
+    class="hotkey-overlay"
+    @click.stop
+    @mousedown="handleMouseDown"
+    @mouseup="handleMouseUp"
+    @contextmenu.prevent
+  >
     <!-- 控制列：模式名 ＋ 當前泳道 ＋ 操作提示 ＋ 退出鈕 -->
-    <div class="hotkey-overlay__bar" @click.stop>
+    <div class="hotkey-overlay__bar" @click.stop @mousedown.stop @mouseup.stop>
       <span class="hotkey-overlay__title">熱鍵輸入模式</span>
+      <span v-if="hotkeyMode.paused.value" class="hotkey-overlay__paused">⏸ 已暫停（點回視窗恢復）</span>
       <span v-if="currentLaneName" class="hotkey-overlay__lane">▸ {{ currentLaneName }}</span>
       <span class="hotkey-overlay__hint">
         <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>／滾輪 切換泳道 ·
@@ -107,6 +153,12 @@ watch(() => rotationStore.activeAxisId, () => hotkeyMode.exit())
   font-size: 0.75rem;
   font-weight: 600;
   color: rgba(245, 249, 252, 0.92);
+}
+
+.hotkey-overlay__paused {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(251, 191, 36, 0.95);
 }
 
 .hotkey-overlay__hint {
