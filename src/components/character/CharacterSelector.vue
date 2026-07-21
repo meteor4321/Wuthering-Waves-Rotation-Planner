@@ -25,7 +25,7 @@ import { getElementColor, getElementIcon } from '@/constants/elements'
 import { characterDisplayName, elementDisplayName } from '@/i18n'
 import type { Character, CharacterElement } from '@/types/character'
 
-interface Props {
+export interface Props {
   /** 目前選中的角色 ID；null 代表該槽位尚未選擇角色 */
   modelValue: string | null
   /** 可選角色清單 */
