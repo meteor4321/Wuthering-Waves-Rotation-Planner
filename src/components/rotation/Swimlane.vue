@@ -884,7 +884,7 @@ async function handleDeselectCharacter(): Promise<void> {
   z-index: 1;
   max-width: 100%;
   padding: 0 0.15rem;
-  font-size: 0.6875rem;
+  font-size: 0.938rem;
   font-weight: 700;
   line-height: 1;
   color: rgba(190, 242, 255, 0.98);
