@@ -79,6 +79,18 @@ const DELETE_GHOST_MS = 520;
 // 版面定型後再算，否則以過渡中的寬度計算會偏。
 const SIDEBAR_TRANSITION_MS = 300;
 
+// 熱鍵導覽首訪旗標鍵（與 useSpotlightTour.HOTKEY_STORAGE_KEY 同值）：於「收合側欄前」
+// 同步判斷是否讓行給導覽。導覽模組因循環相依只能動態 import，其 hasSeenHotkeyTour
+// 取不到同步值；改直接讀 localStorage，避免非同步時序造成側欄開合抖動（見 enter()）。
+const HOTKEY_TOUR_SEEN_KEY = 'wuwa-rotation-hotkey-tour-seen';
+function _shouldAutoPlayHotkeyTour(): boolean {
+  try {
+    return localStorage.getItem(HOTKEY_TOUR_SEEN_KEY) !== 'true';
+  } catch {
+    return false; // localStorage 不可用 → 不自動播放，照常進入模式
+  }
+}
+
 export function useHotkeyInputMode() {
   const rotationStore = useRotationStore();
   const characterStore = useCharacterStore();
@@ -119,6 +131,18 @@ export function useHotkeyInputMode() {
   function enter(): void {
     if (active.value) return;
     if (selectableLanes.value.length === 0) return; // 無任何角色可插入 → 模式無意義，不進入
+    // 首次進入 → 全權交給熱鍵導覽（導覽會自行注入示範資料並以乾淨狀態進入模式）。
+    // 必須在「收合側欄之前」讓行：否則本函式先收合側欄，導覽 begin() 隨即退出模式
+    // 還原側欄、再重新進入又收合 → 側欄開合抖動。旗標同步讀取（見 _shouldAutoPlayHotkeyTour）。
+    if (_shouldAutoPlayHotkeyTour()) {
+      // 動態 import 打破循環相依（導覽的示範腳本 useTourDemo 反向 import 本檔）。
+      void import('@/composables/state/useSpotlightTour').then(({ useSpotlightTour }) => {
+        const tour = useSpotlightTour();
+        if (tour.isActive.value) return; // 導覽已在進行 → 不重複啟動
+        void tour.startHotkeyTour();
+      });
+      return; // 本函式不進入模式、不動側欄；由導覽 begin() 內的 enter()（旗標已寫）走正常進入
+    }
     active.value = true;
     _inspecting.value = false; // 進場重置檢視狀態
     controlsReady.value = false; // 進場先隱藏控制列，待版面定型後再顯示
@@ -133,14 +157,6 @@ export function useHotkeyInputMode() {
       centerGhostCell();
       controlsReady.value = true;
     }, SIDEBAR_TRANSITION_MS);
-    // 首次進入 → 自動播放熱鍵模式導覽（Stage 4-3）。動態 import 打破循環相依
-    // （導覽的示範腳本 useTourDemo 反向 import 本檔）；導覽會先退出模式再走
-    // 自己的「注入示範資料 → 主動進入模式」流程。
-    void import('@/composables/state/useSpotlightTour').then(({ useSpotlightTour }) => {
-      const tour = useSpotlightTour();
-      if (!active.value || tour.isActive.value || tour.hasSeenHotkeyTour.value) return;
-      void tour.startHotkeyTour();
-    });
   }
 
   /** 退出模式：清掉泳道選取、還原側欄收合狀態，回復一切既有行為。 */

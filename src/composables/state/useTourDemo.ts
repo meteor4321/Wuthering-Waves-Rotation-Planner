@@ -12,7 +12,7 @@
 // ============================================================
 
 import { CHARACTER_MAP } from '@/constants/characters';
-import { characterDisplayName, t } from '@/i18n';
+import { characterDisplayName } from '@/i18n';
 import { useBlockNavigation } from '@/composables/board/useBlockNavigation';
 import { useRotationStore } from '@/stores/useRotationStore';
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode';
@@ -136,7 +136,11 @@ export function syncHotkeyLaneProxy(): void {
   const lr = lanes.getBoundingClientRect();
   const sr = document.querySelector('.board__scroll')?.getBoundingClientRect() ?? lr;
   const left = Math.max(lr.left, sr.left);
-  const right = Math.min(lr.right, sr.right);
+  // 右緣一律取捲動視口右緣（非泳道內容右緣）：熱鍵模式把落點置中後,短示範軸的
+  // 內容右緣會落在畫面中央附近,若取「泳道∩視口」交集會讓聚光燈框只覆蓋左半;
+  // 且示範插入／刪除區塊時內容右緣變動,框的右緣會跟著忽縮忽張。可視軌道區
+  // (含尾端留白 .board__end-spacer)本就延伸到視口右緣,取 sr.right 才穩定、語意也對。
+  const right = sr.right;
   const s = laneProxyEl.style;
   s.left = `${left}px`;
   s.top = `${lr.top}px`;
@@ -161,51 +165,6 @@ export function removeHotkeyLaneProxy(): void {
   laneProxyEl = null;
 }
 
-// ── 鍵帽視覺（熱鍵模式導覽用）：畫面上彈出「按了哪顆鍵」的大鍵帽 ──
-let keycapEl: HTMLElement | null = null;
-let keycapFadeTimer: number | null = null;
-function ensureKeycap(): HTMLElement {
-  if (keycapEl) return keycapEl;
-  const el = document.createElement('div');
-  el.className = 'tour-keycap';
-  document.body.appendChild(el);
-  keycapEl = el;
-  return el;
-}
-
-/** 顯示鍵帽（按下態）：固定顯示在幽靈格（下一個落點）右上角，
- *  與「輸入會落在哪」的視覺焦點綁在一起；連續按同鍵時重觸發按壓動畫。 */
-function keycapDown(label: string): void {
-  const el = ensureKeycap();
-  if (keycapFadeTimer !== null) {
-    clearTimeout(keycapFadeTimer);
-    keycapFadeTimer = null;
-  }
-  const anchor = document.querySelector('.track__ghost-cell') ?? document.querySelector('.board__lanes');
-  if (anchor) {
-    const r = anchor.getBoundingClientRect();
-    // 右上角外側偏移；夾在視窗內避免貼近右緣時被裁切。
-    el.style.left = `${Math.min(r.right + 10, window.innerWidth - 72)}px`;
-    el.style.top = `${Math.max(r.top - 6, 48)}px`;
-  }
-  el.textContent = label;
-  el.classList.remove('tour-keycap--press');
-  void el.offsetWidth; // 強制 reflow：同鍵連按也重播按壓動畫
-  el.classList.add('tour-keycap--press');
-  el.style.opacity = '1';
-}
-
-/** 鍵帽放開：解除按下態，停留片刻再淡出（太快消失會看不清按了什麼）。 */
-function keycapUp(): void {
-  if (!keycapEl) return;
-  keycapEl.classList.remove('tour-keycap--press');
-  if (keycapFadeTimer !== null) clearTimeout(keycapFadeTimer);
-  keycapFadeTimer = window.setTimeout(() => {
-    keycapFadeTimer = null;
-    if (keycapEl) keycapEl.style.opacity = '0';
-  }, 400);
-}
-
 /** 對 body 派發合成鍵盤事件（isTrusted=false 穿過導覽攔截；帶 code 供模式比對物理鍵）。 */
 function fireModeKey(type: 'keydown' | 'keyup', code: string, key: string): void {
   document.body.dispatchEvent(
@@ -213,30 +172,23 @@ function fireModeKey(type: 'keydown' | 'keyup', code: string, key: string): void
   );
 }
 
-/** 單擊一顆模式熱鍵：keydown → 短暫按住（<300ms 判 tap）→ keyup 落子；鍵帽同步顯示。 */
-async function tapModeKey(code: string, key: string, capLabel: string, token: number): Promise<void> {
+/** 單擊一顆模式熱鍵：keydown → 短暫按住（<300ms 判 tap）→ keyup 落子。
+ *  輸入回饋（落點預顯、進度環）由重設計後的幽靈格／垂直焦點框呈現，本函式不再另彈鍵帽。 */
+async function tapModeKey(code: string, key: string, token: number): Promise<void> {
   checkToken(token);
-  // 先派發 keydown 再定位鍵帽：切泳道鍵（1/2/3）按下即移動幽靈格，
-  // 鍵帽才能錨定在「新」落點的右上角。
   fireModeKey('keydown', code, key);
-  await sleep(30, token); // 等 Vue 重繪（幽靈格若因切泳道移動，鍵帽才錨得到新位置）
-  keycapDown(capLabel);
-  await sleep(120, token);
+  await sleep(150, token);
   fireModeKey('keyup', code, key);
-  keycapUp();
 }
 
-/** 長按一顆模式熱鍵：按住 holdMs（≥300ms 判 hold）再放開；鍵帽維持按下態。 */
-async function holdModeKey(code: string, key: string, capLabel: string, holdMs: number, token: number): Promise<void> {
+/** 長按一顆模式熱鍵：按住 holdMs（≥300ms 判 hold）再放開（進度環由幽靈格呈現）。 */
+async function holdModeKey(code: string, key: string, holdMs: number, token: number): Promise<void> {
   checkToken(token);
-  fireModeKey('keydown', code, key); // 先 keydown 再定位鍵帽（同 tapModeKey，跟上幽靈格切泳道）
+  fireModeKey('keydown', code, key);
   try {
-    await sleep(30, token); // 等 Vue 重繪幽靈格新位置
-    keycapDown(capLabel);
-    await sleep(holdMs - 30, token);
+    await sleep(holdMs, token);
   } finally {
     fireModeKey('keyup', code, key); // 取消時也放開，避免模式殘留按壓計時
-    keycapUp();
   }
 }
 
@@ -976,17 +928,17 @@ async function demoHotkey1(token: number): Promise<void> {
   await sleep(650, token); // 聚光燈穩定顯示後再開始送出按鍵
 
   // 2) 連續按兩次 E
-  await tapModeKey('KeyE', 'e', 'E', token);
+  await tapModeKey('KeyE', 'e', token);
   await sleep(650, token);
-  await tapModeKey('KeyE', 'e', 'E', token);
+  await tapModeKey('KeyE', 'e', token);
   await sleep(950, token);
 
   // 3) 切到泳道 3 → Q、R → 長按左鍵（≥300ms 判 hold → 插入「Z」）
-  await tapModeKey('Digit3', '3', '3', token);
+  await tapModeKey('Digit3', '3', token);
   await sleep(800, token);
-  await tapModeKey('KeyQ', 'q', 'Q', token);
+  await tapModeKey('KeyQ', 'q', token);
   await sleep(650, token);
-  await tapModeKey('KeyR', 'r', 'R', token);
+  await tapModeKey('KeyR', 'r', token);
   await sleep(800, token);
 
   const overlay = document.querySelector('.hotkey-overlay') as HTMLElement | null;
@@ -994,7 +946,6 @@ async function demoHotkey1(token: number): Promise<void> {
   if (overlay) {
     // 指標移到幽靈格（下一個落點）上按住左鍵，看得到長按進度環
     if (ghost) await cursorEnter(ghost, 650, token);
-    keycapDown(t('hotkey.mouseLeft'));
     ensureCursor().classList.add('tour-cursor--press');
     overlay.dispatchEvent(new MouseEvent('mousedown', {
       bubbles: true, cancelable: true, view: window, button: 0,
@@ -1009,7 +960,6 @@ async function demoHotkey1(token: number): Promise<void> {
         clientX: ghost?.x ?? 0, clientY: ghost?.y ?? 0,
       }));
       ensureCursor().classList.remove('tour-cursor--press');
-      keycapUp();
     }
     if (ghost) clickFx(ghost);
   }
@@ -1017,7 +967,7 @@ async function demoHotkey1(token: number): Promise<void> {
   hideCursor();
 
   // 4) 長按 2：keydown 即切到泳道 2，按滿閾值放開 → 插入入場技「Intro」
-  await holdModeKey('Digit2', '2', '2', 620, token);
+  await holdModeKey('Digit2', '2', 620, token);
   await sleep(1100, token);
 }
 
@@ -1103,15 +1053,6 @@ export function runDemo(step: number | string): void {
 export function cancelDemo(): void {
   runToken++;
   hideCursor();
-  // 鍵帽立即隱藏（不走 keycapUp 的停留淡出，避免殘留到下一步）。
-  if (keycapFadeTimer !== null) {
-    clearTimeout(keycapFadeTimer);
-    keycapFadeTimer = null;
-  }
-  if (keycapEl) {
-    keycapEl.classList.remove('tour-keycap--press');
-    keycapEl.style.opacity = '0';
-  }
   // 熱鍵導覽 step 2 的殘留：氣泡靠左釘選、視窗讓位標記、設定面板、對映表編輯視窗
   //（主導覽不會開，無副作用）。
   document.querySelector('.driver-popover')?.classList.remove('tour-popover--left');

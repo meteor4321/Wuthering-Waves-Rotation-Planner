@@ -427,38 +427,6 @@ function clearAllSelection(): void {
     position: fixed;
     pointer-events: none;
   }
-  /* 熱鍵模式導覽：示範按鍵的鍵帽（錨定於幽靈格右上角外側，
-     底部錨定 translate(0,-100%)＝左下角貼齊幽靈格右上角）。 */
-  .tour-keycap {
-    position: fixed;
-    z-index: 1000000030;
-    transform: translate(0, -100%);
-    pointer-events: none;
-    min-width: 2.1rem;
-    padding: 0.25rem 0.55rem;
-    text-align: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 1rem;
-    font-weight: 700;
-    color: rgba(240, 244, 248, 0.98);
-    background: linear-gradient(180deg, #223049, #17202f);
-    border: 1px solid rgba(34, 211, 238, 0.7);
-    border-radius: 7px;
-    box-shadow:
-      0 3px 0 rgba(34, 211, 238, 0.4),
-      0 0 14px rgba(34, 211, 238, 0.3),
-      0 5px 14px rgba(0, 0, 0, 0.55);
-    opacity: 0;
-    transition: opacity 0.25s ease, transform 0.1s ease, box-shadow 0.1s ease;
-  }
-  .tour-keycap--press {
-    transform: translate(0, calc(-100% + 3px));
-    box-shadow:
-      0 1px 0 rgba(34, 211, 238, 0.6),
-      0 0 20px rgba(34, 211, 238, 0.5),
-      0 3px 9px rgba(0, 0, 0, 0.5);
-    border-color: rgba(34, 211, 238, 1);
-  }
   /* 真實拖曳期間：driver 的 disableActiveInteraction 會把高亮元件設為
      pointer-events:none!important，導致 App 的 elementFromPoint 取不到泳道、
      判為「禁止放置」。拖曳時暫時強制排軸板可命中（遮罩/氣泡則於 JS 關閉）。 */
