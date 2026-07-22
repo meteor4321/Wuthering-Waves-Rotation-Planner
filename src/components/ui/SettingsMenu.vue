@@ -35,43 +35,22 @@ import { SUPPORTED_LOCALES } from '@/i18n'
 const { settings } = useSettings()
 const { t } = useI18n()
 
-// 數值設定：輸入後夾回範圍再寫入（防手打超界值）。
-function onHistoryInput(e: Event): void {
+// ── 數值設定（共用 handler，鍵值＋範圍查表）────────────────────
+// 輸入後夾回範圍再寫入（防手打超界值）；▲▼ 為自製步進
+// （取代原生 spin button：樣式不搭且與數字重疊），同樣夾回範圍。
+type NumericSettingKey = 'historyLimit' | 'trackGapPx' | 'chipPaddingPx' | 'chipFontSizePx'
+const NUMERIC_BOUNDS: Record<NumericSettingKey, { min: number; max: number }> = {
+  historyLimit: HISTORY_LIMIT_BOUNDS,
+  trackGapPx: TRACK_GAP_BOUNDS,
+  chipPaddingPx: CHIP_PADDING_BOUNDS,
+  chipFontSizePx: CHIP_FONT_SIZE_BOUNDS,
+}
+function onNumberInput(key: NumericSettingKey, e: Event): void {
   const v = Number((e.target as HTMLInputElement).value)
-  settings.value.historyLimit = clampSetting(v, HISTORY_LIMIT_BOUNDS, settings.value.historyLimit)
+  settings.value[key] = clampSetting(v, NUMERIC_BOUNDS[key], settings.value[key])
 }
-function onTrackGapInput(e: Event): void {
-  const v = Number((e.target as HTMLInputElement).value)
-  settings.value.trackGapPx = clampSetting(v, TRACK_GAP_BOUNDS, settings.value.trackGapPx)
-}
-// 自製 ▲▼ 步進（取代原生 spin button：樣式不搭且與數字重疊）。夾回範圍。
-function stepHistory(dir: number): void {
-  settings.value.historyLimit = clampSetting(
-    settings.value.historyLimit + dir, HISTORY_LIMIT_BOUNDS, settings.value.historyLimit,
-  )
-}
-function stepTrackGap(dir: number): void {
-  settings.value.trackGapPx = clampSetting(
-    settings.value.trackGapPx + dir, TRACK_GAP_BOUNDS, settings.value.trackGapPx,
-  )
-}
-function onChipPaddingInput(e: Event): void {
-  const v = Number((e.target as HTMLInputElement).value)
-  settings.value.chipPaddingPx = clampSetting(v, CHIP_PADDING_BOUNDS, settings.value.chipPaddingPx)
-}
-function stepChipPadding(dir: number): void {
-  settings.value.chipPaddingPx = clampSetting(
-    settings.value.chipPaddingPx + dir, CHIP_PADDING_BOUNDS, settings.value.chipPaddingPx,
-  )
-}
-function onChipFontSizeInput(e: Event): void {
-  const v = Number((e.target as HTMLInputElement).value)
-  settings.value.chipFontSizePx = clampSetting(v, CHIP_FONT_SIZE_BOUNDS, settings.value.chipFontSizePx)
-}
-function stepChipFontSize(dir: number): void {
-  settings.value.chipFontSizePx = clampSetting(
-    settings.value.chipFontSizePx + dir, CHIP_FONT_SIZE_BOUNDS, settings.value.chipFontSizePx,
-  )
+function stepNumber(key: NumericSettingKey, dir: number): void {
+  settings.value[key] = clampSetting(settings.value[key] + dir, NUMERIC_BOUNDS[key], settings.value[key])
 }
 const dialog = useDialog()
 const hotkeyMapDialog = useHotkeyMapDialog()
@@ -258,11 +237,11 @@ async function handleClearData(): Promise<void> {
                 :min="HISTORY_LIMIT_BOUNDS.min"
                 :max="HISTORY_LIMIT_BOUNDS.max"
                 :value="settings.historyLimit"
-                @change="onHistoryInput"
+                @change="onNumberInput('historyLimit', $event)"
               />
               <span class="settings-menu__stepper" aria-hidden="true">
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepHistory(1)">▲</button>
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepHistory(-1)">▼</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('historyLimit', 1)">▲</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('historyLimit', -1)">▼</button>
               </span>
             </span>
           </label>
@@ -285,11 +264,11 @@ async function handleClearData(): Promise<void> {
                 :min="TRACK_GAP_BOUNDS.min"
                 :max="TRACK_GAP_BOUNDS.max"
                 :value="settings.trackGapPx"
-                @change="onTrackGapInput"
+                @change="onNumberInput('trackGapPx', $event)"
               />
               <span class="settings-menu__stepper" aria-hidden="true">
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepTrackGap(1)">▲</button>
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepTrackGap(-1)">▼</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('trackGapPx', 1)">▲</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('trackGapPx', -1)">▼</button>
               </span>
             </span>
           </label>
@@ -307,11 +286,11 @@ async function handleClearData(): Promise<void> {
                 :min="CHIP_PADDING_BOUNDS.min"
                 :max="CHIP_PADDING_BOUNDS.max"
                 :value="settings.chipPaddingPx"
-                @change="onChipPaddingInput"
+                @change="onNumberInput('chipPaddingPx', $event)"
               />
               <span class="settings-menu__stepper" aria-hidden="true">
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipPadding(1)">▲</button>
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipPadding(-1)">▼</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('chipPaddingPx', 1)">▲</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('chipPaddingPx', -1)">▼</button>
               </span>
             </span>
           </label>
@@ -329,11 +308,11 @@ async function handleClearData(): Promise<void> {
                 :min="CHIP_FONT_SIZE_BOUNDS.min"
                 :max="CHIP_FONT_SIZE_BOUNDS.max"
                 :value="settings.chipFontSizePx"
-                @change="onChipFontSizeInput"
+                @change="onNumberInput('chipFontSizePx', $event)"
               />
               <span class="settings-menu__stepper" aria-hidden="true">
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipFontSize(1)">▲</button>
-                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepChipFontSize(-1)">▼</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('chipFontSizePx', 1)">▲</button>
+                <button type="button" class="settings-menu__step" tabindex="-1" @click.prevent="stepNumber('chipFontSizePx', -1)">▼</button>
               </span>
             </span>
           </label>

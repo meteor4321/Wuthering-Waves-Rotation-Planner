@@ -22,8 +22,6 @@ interface Props {
   isLabelHighlighted?: boolean
   /** 編輯態邊框調暗：多選同步編輯時，批次成員的選取邊框比照輸入框調暗 */
   isEditingDimmed?: boolean
-  /** 是否正在播放刪除消失動畫 */
-  isLeaving?: boolean
   /** 是否播放熱鍵輸入模式的「落下吸附」進場動畫（一次性，由父層旗標控制） */
   isEntering?: boolean
   /** 目前主軸選取總數（多選拖曳時，分身上顯示此數量徽章） */
@@ -35,7 +33,6 @@ const props = withDefaults(defineProps<Props>(), {
   isEditing: false,
   isLabelHighlighted: false,
   isEditingDimmed: false,
-  isLeaving: false,
   isEntering: false,
   multiSelectCount: 0,
 })
@@ -122,7 +119,7 @@ function onKeydown(event: KeyboardEvent): void {
 <template>
   <div
     class="rotation-block"
-    :class="{ 'is-leaving': isLeaving, 'is-entering': isEntering }"
+    :class="{ 'is-entering': isEntering }"
     :data-entry-id="entryId"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
@@ -171,31 +168,10 @@ function onKeydown(event: KeyboardEvent): void {
 
 /* 多選拖曳數量徽章樣式已收斂至共用元件 DragCountBadge.vue。 */
 
-/* 刪除消失動畫：刻意只動內層 .block-chip 的 opacity/transform，不碰 .rotation-block
-   的 transform（該屬性保留給 SortableJS 浮動分身與拖曳 FLIP，見專案記憶）。
-   forwards 保留結束幀，避免移除前的最後一刻閃回原狀。 */
-.rotation-block.is-leaving {
-  pointer-events: none;
-}
+/* 刪除消失動畫已統一為 delete-ghost 克隆（utils/deleteGhost.ts＋style.css 的
+   .hotkey-delete-fade）：狀態即刪，淡出由脫離版面的克隆補播，區塊本身無 leaving 態。 */
 
-.rotation-block.is-leaving :deep(.block-chip) {
-  animation: block-leave 0.18s ease forwards;
-}
-
-@keyframes block-leave {
-  to {
-    opacity: 0;
-    transform: scale(0.78);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rotation-block.is-leaving :deep(.block-chip) {
-    animation: none;
-  }
-}
-
-/* 熱鍵輸入模式插入的「落下吸附」進場：比照刪除動畫，只動內層 .block-chip 的
+/* 熱鍵輸入模式插入的「落下吸附」進場：只動內層 .block-chip 的
    opacity/transform，不碰 .rotation-block 的 transform（保留給 SortableJS，見專案記憶）。
    由上方落下 → 過衝一下 → 回正，營造吸附落定的手感。時長與 useHotkeyInputMode
    的 ENTER_ANIM_MS 對齊。 */

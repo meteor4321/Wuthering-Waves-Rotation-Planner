@@ -22,7 +22,7 @@ import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
 import { useSettings } from '@/composables/state/useSettings';
 import { getElementColor } from '@/constants/elements';
-import { prefersReducedMotion } from '@/utils/reducedMotion';
+import { playDeleteGhosts } from '@/utils/deleteGhost';
 import type { SlotIndex } from '@/types/character';
 import type { PressType } from '@/types/hotkey';
 
@@ -72,9 +72,6 @@ const _enteringId = ref<string | null>(null);
 let _enterTimer: number | null = null;
 // 進場動畫時長（與 RotationBlock 的 block-enter keyframes 對齊；含保險餘裕）。
 const ENTER_ANIM_MS = 260;
-// 刪除淡出克隆的移除時限（與 .hotkey-delete-fade 動畫時長對齊 + 保險餘裕）。
-// 克隆脫離版面、不占欄位，可從容淡出，故拉長營造更柔和的消失（非拖曳刪的 180ms 急收）。
-const DELETE_GHOST_MS = 520;
 // 側欄收合的欄寬過渡時長（AppLayout transition 0.25s）：進場置中捲動須等
 // 版面定型後再算，否則以過渡中的寬度計算會偏。
 const SIDEBAR_TRANSITION_MS = 300;
@@ -260,7 +257,7 @@ export function useHotkeyInputMode() {
       _pressStartAt.set(hotkey, performance.now());
       // 按壓進行中凍結合併結算（同 OS 雙擊判定：分組只看「放開後的靜默間隔」，
       // 按壓多久都不切分）。清掉倒數計時器、暫停結算；放開時 endPress 再依 tap／hold
-      // 重啟計時或結算。若不凍結，單次按壓時長落在合併窗(150ms)~長按閾值(300ms)之間
+      // 重啟計時或結算。若不凍結，單次按壓時長落在合併窗（TAP_COMBINE_WINDOW_MS）~長按閾值（HOLD_THRESHOLD_MS）之間
       // 仍是合法 tap，計時器卻會在按住期間到期把緩衝提前拆成獨立塊。
       if (_tapCombineTimer !== null) {
         clearTimeout(_tapCombineTimer);
@@ -335,32 +332,6 @@ export function useHotkeyInputMode() {
     }, ENTER_ANIM_MS);
   }
 
-  /**
-   * 刪除末塊的淡出分身（delete-ghost 模式，同 useBlockDrag 拖曳刪除的解法）：
-   * 狀態「即刪」保持連按零延遲，消失動畫交給脫離版面的克隆在原螢幕位置補播。
-   * 前一版讓區塊留在 entries 中播 180ms 淡出（animateThenRemove），會使快速連按
-   * 期間版面遲遲不收合、落點置中捲動反覆重算，手感遲滯——故棄用。
-   */
-  function _playDeleteGhost(entryId: string): void {
-    if (prefersReducedMotion()) return;
-    const el = document.querySelector<HTMLElement>(
-      `.rotation-block[data-entry-id="${entryId}"]`,
-    );
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const node = el.cloneNode(true) as HTMLElement;
-    // 若刪的是剛插入、進場動畫未播畢的區塊，克隆會沿用 is-entering 而重播落下動畫，
-    // 疊在淡出上形成「邊掉邊淡」的怪異畫面——移除該 class，讓克隆只單純淡出。
-    node.classList.remove('is-entering');
-    const wrapper = document.createElement('div');
-    wrapper.className = 'hotkey-delete-fade';
-    wrapper.style.left = `${rect.left}px`;
-    wrapper.style.top = `${rect.top}px`;
-    wrapper.appendChild(node);
-    document.body.appendChild(wrapper);
-    window.setTimeout(() => wrapper.remove(), DELETE_GHOST_MS);
-  }
-
   /** 刪除全時間軸的最後一個區塊（不分泳道；節奏遊戲式「倒帶一格」，幽靈格僅為插入指示）。 */
   function deleteLastBlock(): void {
     _inspecting.value = false; // 刪除＝結束檢視（conveyor 於 entries 變化時重新置中）
@@ -368,8 +339,8 @@ export function useHotkeyInputMode() {
     const last = rotationStore.entries[rotationStore.entries.length - 1];
     if (last) {
       // 先克隆再即刪：版面立即收合（下一塊馬上成為新末塊，連按不卡），
-      // 淡出由固定在原螢幕位置的克隆呈現，與版面脫鉤。
-      _playDeleteGhost(last.id);
+      // 淡出由固定在原螢幕位置的克隆呈現，與版面脫鉤（共用 utils/deleteGhost）。
+      playDeleteGhosts([last.id]);
       rotationStore.deleteBlock(last.id); // 落點跟隨由 useGhostConveyor 監聽 entries 數觸發
       _deleteFlashTick.value++; // 直柱閃紅提示（RotationBoard 監聽）
     }
