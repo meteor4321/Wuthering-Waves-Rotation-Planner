@@ -108,6 +108,14 @@ export function useHotkeyInputMode() {
       centerGhostCell();
       controlsReady.value = true;
     }, SIDEBAR_TRANSITION_MS);
+    // 首次進入 → 自動播放熱鍵模式導覽（Stage 4-3）。動態 import 打破循環相依
+    // （導覽的示範腳本 useTourDemo 反向 import 本檔）；導覽會先退出模式再走
+    // 自己的「注入示範資料 → 主動進入模式」流程。
+    void import('@/composables/state/useSpotlightTour').then(({ useSpotlightTour }) => {
+      const tour = useSpotlightTour();
+      if (!active.value || tour.isActive.value || tour.hasSeenHotkeyTour.value) return;
+      void tour.startHotkeyTour();
+    });
   }
 
   /** 退出模式：清掉泳道選取、還原側欄收合狀態，回復一切既有行為。 */

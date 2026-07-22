@@ -226,6 +226,7 @@
     "hkDelete": "Delete the last block of the character axis",
     "hkExit": "Exit Hotkey Input Mode",
     "replayTour": "Replay the tour",
+    "replayHotkeyTour": "Hotkey Input Mode tour",
     "githubLink": "GitHub"
   },
   "tour": {
@@ -256,7 +257,11 @@
     "stepExportTitle": "Export an image",
     "stepExportDesc": "Save the team rotation as an image.",
     "stepHelpTitle": "Help center",
-    "stepHelpDesc": "Click here to look up shortcuts or replay the tutorial."
+    "stepHelpDesc": "Click here to look up shortcuts or replay the tutorial.",
+    "stepHk1Title": "Hotkey Input Mode",
+    "stepHk1Desc": "Insert blocks directly with mouse or keyboard input — no dragging or editing needed.",
+    "stepHk2Title": "Hotkey Map",
+    "stepHk2Desc": "Customize which block each key inserts, and its press type, in the Hotkey Map found in the settings menu."
   },
   "dialog": {
     "ok": "OK",

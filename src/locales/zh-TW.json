@@ -226,6 +226,7 @@
     "hkDelete": "刪除角色軸末端的區塊",
     "hkExit": "退出熱鍵輸入模式",
     "replayTour": "重新觀看導覽",
+    "replayHotkeyTour": "熱鍵輸入模式導覽",
     "githubLink": "GitHub"
   },
   "tour": {
@@ -256,7 +257,11 @@
     "stepExportTitle": "匯出圖片",
     "stepExportDesc": "將隊伍排軸保存為圖片。",
     "stepHelpTitle": "使用說明中心",
-    "stepHelpDesc": "點擊這裡可查詢快捷鍵或重新觀看使用教學。"
+    "stepHelpDesc": "點擊這裡可查詢快捷鍵或重新觀看使用教學。",
+    "stepHk1Title": "熱鍵輸入模式",
+    "stepHk1Desc": "直接透過滑鼠或鍵盤輸入插入區塊，無需拖曳與編輯。",
+    "stepHk2Title": "熱鍵對映表",
+    "stepHk2Desc": "在設定選單的「熱鍵對映表」中，自訂每個按鍵對應的區塊文字與按法。"
   },
   "dialog": {
     "ok": "確定",

@@ -226,6 +226,7 @@
     "hkDelete": "删除角色轴末端的区块",
     "hkExit": "退出热键输入模式",
     "replayTour": "重新观看导览",
+    "replayHotkeyTour": "热键输入模式导览",
     "githubLink": "GitHub"
   },
   "tour": {
@@ -256,7 +257,11 @@
     "stepExportTitle": "导出图片",
     "stepExportDesc": "将队伍排轴保存为图片。",
     "stepHelpTitle": "使用说明中心",
-    "stepHelpDesc": "点击这里可查询快捷键或重新观看使用教程。"
+    "stepHelpDesc": "点击这里可查询快捷键或重新观看使用教程。",
+    "stepHk1Title": "热键输入模式",
+    "stepHk1Desc": "直接通过鼠标或键盘输入插入区块，无需拖拽与编辑。",
+    "stepHk2Title": "热键映射表",
+    "stepHk2Desc": "在设置菜单的「热键映射表」中，自定义每个按键对应的区块文字与按法。"
   },
   "dialog": {
     "ok": "确定",

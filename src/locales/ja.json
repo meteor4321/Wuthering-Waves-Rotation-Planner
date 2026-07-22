@@ -226,6 +226,7 @@
     "hkDelete": "キャラクター軸の末尾ブロックを削除",
     "hkExit": "ホットキー入力モードを終了",
     "replayTour": "ツアーをもう一度見る",
+    "replayHotkeyTour": "ホットキー入力モードのツアー",
     "githubLink": "GitHub"
   },
   "tour": {
@@ -256,7 +257,11 @@
     "stepExportTitle": "画像をエクスポート",
     "stepExportDesc": "チームのローテーションを画像として保存します。",
     "stepHelpTitle": "使い方センター",
-    "stepHelpDesc": "ここをクリックしてショートカット確認やチュートリアルの再生ができます。"
+    "stepHelpDesc": "ここをクリックしてショートカット確認やチュートリアルの再生ができます。",
+    "stepHk1Title": "ホットキー入力モード",
+    "stepHk1Desc": "マウスやキーボードの入力だけでブロックを挿入できます。ドラッグや編集は不要です。",
+    "stepHk2Title": "ホットキーマップ",
+    "stepHk2Desc": "設定メニューの「ホットキーマップ」で、各キーに対応するブロックの文字と押し方をカスタマイズできます。"
   },
   "dialog": {
     "ok": "OK",
