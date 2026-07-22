@@ -132,6 +132,8 @@
     "capsLockHint": "區塊文字提交時自動轉大寫",
     "animations": "動畫效果",
     "animationsHint": "關閉可減少動態、提升效能",
+    "tapCombine": "連擊合併",
+    "tapCombineHint": "快速連擊可串接區塊文字",
     "historyLimit": "復原步數上限",
     "historyLimitHint": "{min}–{max} 步",
     "trackGap": "區塊間距",

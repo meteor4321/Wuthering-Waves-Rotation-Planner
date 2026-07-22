@@ -354,6 +354,21 @@ async function handleClearData(): Promise<void> {
           </button>
         </div>
 
+        <!-- 熱鍵模式：快速連點合併 -->
+        <label class="settings-menu__row settings-menu__row--clickable">
+          <span class="settings-menu__label">
+            {{ $t('settings.tapCombine') }}
+            <span class="settings-menu__hint">{{ $t('settings.tapCombineHint') }}</span>
+          </span>
+          <input
+            v-model="settings.hotkeyTapCombine"
+            type="checkbox"
+            class="settings-menu__switch"
+            role="switch"
+            :aria-checked="settings.hotkeyTapCombine"
+          />
+        </label>
+
         <div class="settings-menu__divider" aria-hidden="true" />
 
         <!-- 清除資料（危險操作） -->

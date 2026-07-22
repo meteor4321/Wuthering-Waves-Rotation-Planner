@@ -20,10 +20,11 @@ import { useHistory } from '@/composables/state/useHistory';
 import { useSidebarCollapse } from '@/composables/state/useSidebarCollapse';
 import { useBoardScroll } from '@/composables/board/useBoardScroll';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
+import { useSettings } from '@/composables/state/useSettings';
 import { getElementColor } from '@/constants/elements';
 import { prefersReducedMotion } from '@/utils/reducedMotion';
 import type { SlotIndex } from '@/types/character';
-import type { HotkeyMapEntry, PressType } from '@/types/hotkey';
+import type { PressType } from '@/types/hotkey';
 
 // 模組層級單例：模式開關（整個 App 共用同一份）。
 const active = ref(false);
@@ -36,6 +37,15 @@ const controlsReady = ref(false);
 let _sidebarWasCollapsed = false;
 // 單擊／長按閾值：keydown 起計、keyup 依按住時長判定（§3.3，寫死不設定）。
 const HOLD_THRESHOLD_MS = 300;
+// ── 快速連點合併（設定 hotkeyTapCombine 啟用時）────────────────
+// 合併時間窗：每次 tap 落子（或新按壓開始）後重新起算；期間無新輸入才把
+// 緩衝內容「直接串接」成單一區塊落下（落子最多延遲此毫秒數）。調整手感改這裡。
+const TAP_COMBINE_WINDOW_MS = 150;
+// 待合併的 tap label 緩衝（依輸入順序；空陣列＝無待合併內容）。
+// 響應式：驅動 Swimlane 幽靈格的合併預顯文字。
+const _tapBufferLabels = ref<string[]>([]);
+// 合併結算計時器 id（每次 tap／起按重新起算；到期即結算落子）。
+let _tapCombineTimer: number | null = null;
 // 進行中的按壓：鍵位（event.code 或 MouseLeft/Right）→ 起按時刻（performance.now）。
 // 模組層級共用：鍵盤 keydown/keyup 走 useKeyboardShortcuts、滑鼠走 overlay，
 // 兩路各自 useHotkeyInputMode() 但共享此表，落子一律在 keyup/mouseup 判型別後。
@@ -69,6 +79,7 @@ export function useHotkeyInputMode() {
   const sidebarCollapse = useSidebarCollapse();
   const { scrollSelectorIntoView } = useBoardScroll();
   const hotkeyMap = useHotkeyMap();
+  const { settings } = useSettings();
 
   /** 可選中的泳道（已選角），依畫面上下顯示順序排列。 */
   const selectableLanes = computed<SlotIndex[]>(() =>
@@ -125,6 +136,7 @@ export function useHotkeyInputMode() {
   /** 退出模式：清掉泳道選取、還原側欄收合狀態，回復一切既有行為。 */
   function exit(): void {
     if (!active.value) return;
+    flushTapBuffer(); // 待合併內容先結算落子，再退出（不丟輸入）
     active.value = false;
     paused.value = false;
     controlsReady.value = false;
@@ -140,6 +152,7 @@ export function useHotkeyInputMode() {
     const slot = laneOrder.value[displayIndex];
     if (slot === undefined) return false;
     if (!selectableLanes.value.includes(slot)) return false;
+    flushTapBuffer(); // 切泳道前先結算待合併內容（落在原泳道）
     rotationStore.selectLane(slot);
     return true;
   }
@@ -150,18 +163,19 @@ export function useHotkeyInputMode() {
     if (lanes.length === 0) return;
     const idx = lanes.indexOf(rotationStore.selectedLaneIndex as SlotIndex);
     const next = idx === -1 ? 0 : (idx + direction + lanes.length) % lanes.length;
+    flushTapBuffer(); // 切泳道前先結算待合併內容（落在原泳道）
     rotationStore.selectLane(lanes[next]);
   }
 
-  /** 把一條對映條目插入選中泳道末尾（＝1D 陣列末尾）。 */
-  function insertEntry(entry: HotkeyMapEntry): void {
+  /** 把一段文字作為新區塊插入選中泳道末尾（＝1D 陣列末尾）。 */
+  function insertLabel(label: string): void {
     const lane = rotationStore.selectedLaneIndex;
     if (lane === null) return;
     const character = characterStore.slots[lane].character;
     if (!character) return;
-    // addFreeformBlock 自帶 history.record() → 一鍵一步 undo；回傳新區塊 id。
+    // addFreeformBlock 自帶 history.record() → 一鍵（或一次合併結算）一步 undo。
     const newId = rotationStore.addFreeformBlock(
-      entry.label,
+      label,
       getElementColor(character.element),
       lane,
       character.id,
@@ -174,6 +188,38 @@ export function useHotkeyInputMode() {
   }
 
   /**
+   * 立即結算連點合併緩衝：把累積的 label 直接串接成單一區塊落下。
+   * 無緩衝內容＝no-op。除計時器到期外，任何會改變落點語意的操作
+   * （切泳道／刪除／長按落子／undo·redo／暫停／退出）前都先呼叫本函式。
+   */
+  function flushTapBuffer(): void {
+    if (_tapCombineTimer !== null) {
+      clearTimeout(_tapCombineTimer);
+      _tapCombineTimer = null;
+    }
+    if (_tapBufferLabels.value.length === 0) return;
+    const combined = _tapBufferLabels.value.join('');
+    _tapBufferLabels.value = [];
+    insertLabel(combined);
+  }
+
+  /** 重新起算合併結算計時器（每次 tap 入緩衝、或按壓開始時延後結算）。 */
+  function _restartTapCombineTimer(): void {
+    if (_tapCombineTimer !== null) clearTimeout(_tapCombineTimer);
+    _tapCombineTimer = window.setTimeout(() => {
+      _tapCombineTimer = null;
+      flushTapBuffer();
+    }, TAP_COMBINE_WINDOW_MS);
+  }
+
+  /** 把一次 tap 排入合併緩衝並重新計時；幽靈格同步預顯累積文字（寬度隨之變化）。 */
+  function bufferTap(label: string): void {
+    _tapBufferLabels.value = [..._tapBufferLabels.value, label];
+    _restartTapCombineTimer();
+    centerGhostCell(); // 預顯文字變長 → 幽靈格變寬，保持落點在視野內
+  }
+
+  /**
    * 起按：記錄該鍵位的起按時刻（keydown／mousedown 共用）。
    * 回 true＝此鍵位有對映（呼叫端據此 preventDefault）。暫停中或無對映不記。
    * 已在按住（含作業系統自動重複）則不覆蓋起按時刻。
@@ -183,6 +229,9 @@ export function useHotkeyInputMode() {
     if (!hotkeyMap.hasHotkey(hotkey)) return false;
     if (!_pressStartAt.has(hotkey)) {
       _pressStartAt.set(hotkey, performance.now());
+      // 按壓進行中先延後合併結算：避免連點節奏稍慢時（keyup 間隔略超時間窗）
+      // 在按住期間結算而拆塊；放開判為 tap 會續入同一緩衝。
+      if (_tapBufferLabels.value.length > 0) _restartTapCombineTimer();
       // 新一輪按壓起始：驅動幽靈格徑向進度環從 0 開始填（作業系統自動重複不覆蓋）。
       _pressingHotkey.value = hotkey;
       _scheduleHoldPreview(hotkey);
@@ -231,7 +280,14 @@ export function useHotkeyInputMode() {
     const pressType: PressType = performance.now() - start >= HOLD_THRESHOLD_MS ? 'hold' : 'tap';
     const entry = hotkeyMap.resolveByCodeAndPress(hotkey, pressType);
     if (!entry) return false;
-    insertEntry(entry);
+    if (settings.value.hotkeyTapCombine && pressType === 'tap') {
+      // 快速連點合併：tap 先入緩衝，時間窗內無新輸入才串接落成一塊。
+      bufferTap(entry.label);
+    } else {
+      // 長按落子不參與合併：先結算緩衝，再單獨插入。
+      flushTapBuffer();
+      insertLabel(entry.label);
+    }
     return true;
   }
 
@@ -273,6 +329,7 @@ export function useHotkeyInputMode() {
 
   /** 刪除選中泳道的最後一個區塊（依 slotIndex 過濾後的最後一項）。 */
   function deleteLastInLane(): void {
+    flushTapBuffer(); // 先結算待合併內容再刪（刪除語意以已落子的末塊為準）
     const lane = rotationStore.selectedLaneIndex;
     if (lane === null) return;
     const laneEntries = rotationStore.entries.filter((e) => e.slotIndex === lane);
@@ -302,6 +359,7 @@ export function useHotkeyInputMode() {
         // undo/redo 套用快照後會清空所有選取（useHistory._apply 防懸空參照），
         // 模式的泳道選取須自行補回：記住套用前的泳道、事後收斂補選。
         const laneBefore = rotationStore.selectedLaneIndex;
+        flushTapBuffer(); // 待合併內容先結算成一步，undo 語意才乾淨
         if (k === 'y' || event.shiftKey) history.redo();
         else history.undo();
         ensureLaneSelected(laneBefore);
@@ -364,6 +422,7 @@ export function useHotkeyInputMode() {
 
   /** 暫停接收輸入（視窗 blur／滑鼠移出視窗）：清掉未放開的按壓避免回焦誤觸。 */
   function pause(): void {
+    flushTapBuffer(); // 失焦前結算待合併內容，避免緩衝跨暫停殘留
     paused.value = true;
     _pressStartAt.clear();
     _pressingHotkey.value = null; // 失焦暫停：停止進度環，避免回焦時殘留
@@ -382,6 +441,11 @@ export function useHotkeyInputMode() {
   );
   // 長按即時預顯的 label（達閾值且有 hold 條目才非空）。驅動 Swimlane 幽靈格文字。
   const holdPreviewLabel = computed<string | null>(() => _holdPreviewLabel.value);
+  // 連點合併預顯：緩衝中累積的串接文字（無待合併內容為 null）。
+  // 驅動 Swimlane 幽靈格顯示「即將合併落下的一塊」，寬度隨文字長度變化。
+  const tapCombineLabel = computed<string | null>(() =>
+    _tapBufferLabels.value.length > 0 ? _tapBufferLabels.value.join('') : null,
+  );
   // 剛以熱鍵插入的區塊 id（進場動畫用；播畢為 null）。驅動 RotationBlock 落下吸附。
   const enteringId = computed<string | null>(() => _enteringId.value);
 
@@ -391,6 +455,7 @@ export function useHotkeyInputMode() {
     controlsReady,
     pressing,
     holdPreviewLabel,
+    tapCombineLabel,
     enteringId,
     selectableLanes,
     enter,

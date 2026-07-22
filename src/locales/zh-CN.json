@@ -132,6 +132,8 @@
     "capsLockHint": "区块文本提交时自动转大写",
     "animations": "动画效果",
     "animationsHint": "关闭可减少动态、提升性能",
+    "tapCombine": "连点合并",
+    "tapCombineHint": "热键输入模式：快速连点的文本串接成单一区块",
     "historyLimit": "撤销步数上限",
     "historyLimitHint": "{min}–{max} 步",
     "trackGap": "区块间距",

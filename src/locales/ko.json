@@ -132,6 +132,8 @@
     "capsLockHint": "블록 텍스트 확정 시 자동 대문자화",
     "animations": "애니메이션",
     "animationsHint": "끄면 동작을 줄이고 성능을 향상",
+    "tapCombine": "연타 병합",
+    "tapCombineHint": "핫키 입력 모드: 빠른 연타를 하나의 블록으로 병합",
     "historyLimit": "실행 취소 횟수 제한",
     "historyLimitHint": "{min}–{max} 단계",
     "trackGap": "블록 간격",

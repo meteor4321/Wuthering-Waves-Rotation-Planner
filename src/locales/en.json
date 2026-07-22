@@ -132,6 +132,8 @@
     "capsLockHint": "Auto-uppercase block text on commit",
     "animations": "Animations",
     "animationsHint": "Turn off to reduce motion and improve performance",
+    "tapCombine": "Rapid Click Combination",
+    "tapCombineHint": "Rapidly clicking will append block labels into a single block",
     "historyLimit": "Undo history limit",
     "historyLimitHint": "{min}–{max} steps",
     "trackGap": "Block spacing",

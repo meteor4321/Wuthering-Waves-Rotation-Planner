@@ -493,6 +493,7 @@ async function handleDeselectCharacter(): Promise<void> {
               :class="{
                 'track__ghost-cell--pressing': hotkeyMode.pressing.value,
                 'track__ghost-cell--hold': hotkeyMode.holdPreviewLabel.value !== null,
+                'track__ghost-cell--combine': hotkeyMode.tapCombineLabel.value !== null,
               }"
               :style="{ gridColumn: String(addButtonColumn + 1) }"
               aria-hidden="true"
@@ -510,6 +511,11 @@ async function handleDeselectCharacter(): Promise<void> {
                 v-if="hotkeyMode.holdPreviewLabel.value !== null"
                 class="track__ghost-hold-label"
               >{{ hotkeyMode.holdPreviewLabel.value }}</span>
+              <!-- 連點合併預顯：緩衝累積的串接文字（樣式同長按預顯；格寬隨文字動態變化） -->
+              <span
+                v-else-if="hotkeyMode.tapCombineLabel.value !== null"
+                class="track__ghost-hold-label"
+              >{{ hotkeyMode.tapCombineLabel.value }}</span>
               <span v-else class="track__ghost-icon">⌨</span>
             </div>
 
@@ -906,6 +912,16 @@ async function handleDeselectCharacter(): Promise<void> {
 }
 /* 達閾值時底色略提亮，強化「已進入長按區」的狀態感。 */
 .track__ghost-cell--hold {
+  border-style: solid;
+  background: rgba(34, 211, 238, 0.16);
+}
+
+/* 連點合併預顯：視覺同長按預顯（實線提亮），但格寬改隨串接文字動態變化
+   （覆蓋固定 3rem 正方；min-width 保底避免比閒置格還窄）。 */
+.track__ghost-cell--combine {
+  width: max-content;
+  min-width: 3rem;
+  padding: 0 0.5rem;
   border-style: solid;
   background: rgba(34, 211, 238, 0.16);
 }
