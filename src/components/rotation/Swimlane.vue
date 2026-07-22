@@ -515,10 +515,12 @@ async function handleDeselectCharacter(): Promise<void> {
               <span class="track__ghost-icon">⌨</span>
               <!-- 外置預顯文字（R3）：長按 hold label／連點合併累積文字，顯示於
                    幽靈格右緣外側（絕對定位不佔欄寬，格子保持固定正方不影響置中）。 -->
-              <span
-                v-if="ghostPreviewText !== null"
-                class="track__ghost-preview"
-              >{{ ghostPreviewText }}</span>
+              <Transition name="ghost-preview">
+                <span
+                  v-if="ghostPreviewText !== null"
+                  class="track__ghost-preview"
+                >{{ ghostPreviewText }}</span>
+              </Transition>
             </div>
 
             <button
@@ -859,10 +861,11 @@ async function handleDeselectCharacter(): Promise<void> {
   justify-content: center;
   width: 3rem; /* 固定正方形：不隨內容/欄寬變化 */
   height: 3rem;
-  border: 1.5px dashed rgba(34, 211, 238, 0.65);
+  /* 琥珀色調（與垂直焦點框直柱同色系）：熱鍵模式的幽靈格／直柱／預顯統一暖色。 */
+  border: 1.5px dashed rgba(251, 191, 36, 0.65);
   border-radius: 3px;
-  background: rgba(34, 211, 238, 0.08);
-  color: rgba(34, 211, 238, 0.6);
+  background: rgba(251, 191, 36, 0.08);
+  color: rgba(251, 191, 36, 0.6);
   font-size: 0.875rem;
   pointer-events: none;
   user-select: none;
@@ -880,7 +883,7 @@ async function handleDeselectCharacter(): Promise<void> {
 }
 
 /* 外置預顯文字（R3）：長按 hold label／連點合併累積文字，顯示於幽靈格
-   右緣外側的青色膠囊。絕對定位、不佔 grid 欄寬 → 幽靈格保持固定正方、
+   右緣外側的琥珀色膠囊。絕對定位、不佔 grid 欄寬 → 幽靈格保持固定正方、
    置中釘點不受文字長度影響；右側是尾端墊片留白，再長也不會撞到內容。
    快速淡入（ease-out 前快後慢，約半程即清晰可辨，無慢半拍感）。 */
 .track__ghost-preview {
@@ -890,28 +893,34 @@ async function handleDeselectCharacter(): Promise<void> {
   left: calc(100% + 1.25rem);
   top: 50%;
   transform: translateY(-50%);
+  /* 明亮實心琥珀膠囊＋深色字：完全不透明（不透背景避免發糊），亮底深字對比高、
+     在深色頁面上清晰醒目，不再是看不清的暗塊。 */
   padding: 0.35rem 0.6rem;
-  border: 1px solid rgba(34, 211, 238, 0.5);
   border-radius: 0.375rem;
-  background: rgba(8, 51, 68, 0.85);
+  background: rgba(255, 174, 34, 0.9);
   font-size: 0.938rem;
   font-weight: 700;
   line-height: 1;
-  color: rgba(190, 242, 255, 0.98);
+  color: rgb(30, 24, 8);
   white-space: nowrap;
-  animation: ghost-preview-in 120ms ease-out both;
 }
-@keyframes ghost-preview-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* 進出場：快速淡入（ease-out 前快後慢，約半程即清晰）、快速淡出（ease-in）。
+   由 <Transition name="ghost-preview"> 驅動，v-if 切換時離場也有動畫（原本 v-if
+   直接移除無離場效果）。 */
+.ghost-preview-enter-active {
+  transition: opacity 120ms ease-out;
+}
+.ghost-preview-leave-active {
+  transition: opacity 420ms ease-out;
+}
+.ghost-preview-enter-from,
+.ghost-preview-leave-to {
+  opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .track__ghost-preview {
-    animation: none;
+  .ghost-preview-enter-active,
+  .ghost-preview-leave-active {
+    transition: none;
   }
 }
 /* 達閾值／合併累積中：底色略提亮＋實線，強化「輸入進行中」的狀態感
@@ -919,7 +928,7 @@ async function handleDeselectCharacter(): Promise<void> {
 .track__ghost-cell--hold,
 .track__ghost-cell--combine {
   border-style: solid;
-  background: rgba(34, 211, 238, 0.16);
+  background: rgba(251, 191, 36, 0.16);
 }
 
 /* 長按進度環：鋪滿幽靈格；閒置隱藏，按壓中淡入。circle 用 CSS 動畫填 stroke。
@@ -939,7 +948,7 @@ async function handleDeselectCharacter(): Promise<void> {
 
 .track__ghost-ring-track {
   fill: none;
-  stroke: rgba(34, 211, 238, 0.15);
+  stroke: rgba(251, 191, 36, 0.15);
   stroke-width: 2.5;
 }
 
@@ -948,12 +957,12 @@ async function handleDeselectCharacter(): Promise<void> {
    force-reduce-motion 會把動畫壓成瞬間（環直接滿），仍給得到狀態提示。 */
 .track__ghost-ring-fill {
   fill: none;
-  stroke: rgba(34, 211, 238, 0.95);
+  stroke: rgba(251, 191, 36, 0.95);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-dasharray: 56.55;
   stroke-dashoffset: 56.55;
-  filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.7));
+  filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.7));
 }
 .track__ghost-cell--pressing .track__ghost-ring-fill {
   animation: ghost-ring-fill 300ms linear forwards;

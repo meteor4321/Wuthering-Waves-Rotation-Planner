@@ -58,6 +58,9 @@ const _pressingHotkey = ref<string | null>(null);
 const _holdPreviewLabel = ref<string | null>(null);
 // 達閾值計時器 id（跨鍵盤／滑鼠共用單一計時器；起按設、放開／暫停／退出清）。
 let _holdTimer: number | null = null;
+// 刪除訊號（遞增計數）：每次熱鍵刪除 +1，驅動垂直焦點框直柱閃紅一次
+// （RotationBoard watch 此值；用計數而非 boolean 讓連刪能重複觸發）。
+const _deleteFlashTick = ref(0);
 // 剛以熱鍵插入的區塊 id：驅動 RotationBlock 播一次「落下吸附」進場動畫（§3.2）。
 // 動畫播畢即清（一次性）；下次插入覆蓋為新 id。
 const _enteringId = ref<string | null>(null);
@@ -341,6 +344,7 @@ export function useHotkeyInputMode() {
       // 淡出由固定在原螢幕位置的克隆呈現，與版面脫鉤。
       _playDeleteGhost(last.id);
       rotationStore.deleteBlock(last.id); // 落點跟隨由 useGhostConveyor 監聽 entries 數觸發
+      _deleteFlashTick.value++; // 直柱閃紅提示（RotationBoard 監聽）
     }
   }
 
@@ -457,6 +461,7 @@ export function useHotkeyInputMode() {
     holdPreviewLabel,
     tapCombineLabel,
     enteringId,
+    deleteFlashTick: _deleteFlashTick,
     selectableLanes,
     enter,
     exit,
