@@ -40,7 +40,7 @@ const HOLD_THRESHOLD_MS = 300;
 // ── 快速連點合併（設定 hotkeyTapCombine 啟用時）────────────────
 // 合併時間窗：每次 tap 落子（或新按壓開始）後重新起算；期間無新輸入才把
 // 緩衝內容「直接串接」成單一區塊落下（落子最多延遲此毫秒數）。調整手感改這裡。
-const TAP_COMBINE_WINDOW_MS = 150;
+const TAP_COMBINE_WINDOW_MS = 200;
 // 待合併的 tap label 緩衝（依輸入順序；空陣列＝無待合併內容）。
 // 響應式：驅動 Swimlane 幽靈格的合併預顯文字。
 const _tapBufferLabels = ref<string[]>([]);
@@ -229,9 +229,14 @@ export function useHotkeyInputMode() {
     if (!hotkeyMap.hasHotkey(hotkey)) return false;
     if (!_pressStartAt.has(hotkey)) {
       _pressStartAt.set(hotkey, performance.now());
-      // 按壓進行中先延後合併結算：避免連點節奏稍慢時（keyup 間隔略超時間窗）
-      // 在按住期間結算而拆塊；放開判為 tap 會續入同一緩衝。
-      if (_tapBufferLabels.value.length > 0) _restartTapCombineTimer();
+      // 按壓進行中凍結合併結算（同 OS 雙擊判定：分組只看「放開後的靜默間隔」，
+      // 按壓多久都不切分）。清掉倒數計時器、暫停結算；放開時 endPress 再依 tap／hold
+      // 重啟計時或結算。若不凍結，單次按壓時長落在合併窗(150ms)~長按閾值(300ms)之間
+      // 仍是合法 tap，計時器卻會在按住期間到期把緩衝提前拆成獨立塊。
+      if (_tapCombineTimer !== null) {
+        clearTimeout(_tapCombineTimer);
+        _tapCombineTimer = null;
+      }
       // 新一輪按壓起始：驅動幽靈格徑向進度環從 0 開始填（作業系統自動重複不覆蓋）。
       _pressingHotkey.value = hotkey;
       _scheduleHoldPreview(hotkey);
