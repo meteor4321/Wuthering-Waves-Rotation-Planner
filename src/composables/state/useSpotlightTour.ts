@@ -40,7 +40,6 @@ import {
 } from '@/composables/state/useTourDemo';
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
-import { useHotkeyMapDialog } from '@/composables/state/useHotkeyMapDialog';
 import type { HotkeyMapEntry, IntroHotkeyEntry } from '@/types/hotkey';
 import type { CharacterSlots, SlotIndex } from '@/types/character';
 import type { RotationAxis, RotationEntry } from '@/types/rotation';
