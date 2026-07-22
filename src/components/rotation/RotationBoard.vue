@@ -13,10 +13,11 @@
 //           （掛 window bubble、按在區塊上讓位），避免互搶事件。
 // ============================================================
 
-import { computed, onMounted, nextTick, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
 import Swimlane from '@/components/rotation/Swimlane.vue'
 import HotkeyModeOverlay from '@/components/rotation/HotkeyModeOverlay.vue'
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode'
+import { useGhostConveyor } from '@/composables/board/useGhostConveyor'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useRotationStore } from '@/stores/useRotationStore'
@@ -46,6 +47,8 @@ const history = useHistory()
 
 // 熱鍵輸入模式：面板右上角進入鈕 ＋ active 時掛 overlay（控制列/滾輪切泳道）。
 const hotkeyMode = useHotkeyInputMode()
+// 幽靈格輸送帶動態：幽靈格釘在可視區水平中央，落子／刪除時底下的軸平滑捲動。
+useGhostConveyor()
 
 // ── 泳道顯示順序 ─────────────────────────────────────────────
 // 依 laneOrder 把 slots 重新排成「上下顯示順序」。slots 以 slotIndex 為索引，
@@ -313,9 +316,13 @@ watch(previewGridTemplate, () => {
   content.style.minWidth = `${prev.scrollLeft + prev.clientWidth}px`
 
   // 步驟二：量測「自然」內容寬（此次強制排版帶著撐寬，offset 合法、不會夾回）。
-  // 泳道群為 flex 子項（不被父層 min-width 拉伸），gBCR 即自然寬；尾端留白恆 50cqw。
+  // 泳道群為 flex 子項（不被父層 min-width 拉伸），gBCR 即自然寬；尾端留白
+  // 直接實測（寬度由 --board-end-spacer 決定，勿在此重複硬編碼）。
   const lanesW = content.querySelector('.board__lanes')?.getBoundingClientRect().width ?? 0
-  const naturalMax = Math.max(0, lanesW + prev.clientWidth * 0.5 - scroll.clientWidth)
+  const spacerW =
+    content.querySelector('.board__end-spacer')?.getBoundingClientRect().width
+      ?? prev.clientWidth * 0.5
+  const naturalMax = Math.max(0, lanesW + spacerW - scroll.clientWidth)
 
   if (scroll.scrollLeft > naturalMax) {
     // 步驟三：程式化捲動到新的最右端（正常捲動路徑，sticky 與偏移同幀一致）。
@@ -391,9 +398,10 @@ const laneRingVisible = ref(false)
 const laneRingNoSlide = ref(false)
 
 watch(
-  [() => rotationStore.selectedLaneIndex, laneOrder],
+  [() => rotationStore.selectedLaneIndex, laneOrder, () => hotkeyMode.active.value],
   ([lane]) => {
-    if (lane === null) {
+    // 熱鍵模式中不畫橫向焦點環：落點指示交給垂直焦點框直柱（R4 後橫框視覺冗餘）。
+    if (lane === null || hotkeyMode.active.value) {
       laneRingVisible.value = false
       return
     }
@@ -408,6 +416,209 @@ watch(
   },
   { flush: 'post' },
 )
+
+// ── 熱鍵輸入模式垂直焦點框（R4）────────────────────────────────
+// 貫穿三泳道、框住幽靈欄的直柱（節奏遊戲式判定列）。幽靈欄螢幕置中、
+// 輸送帶動畫中保持螢幕固定，故直柱以「量測幽靈格實際位置」驅動、非跟捲軸移動：
+//   left/width＝幽靈格中心±半寬（換算為 .rotation-board 本地座標，本身不捲動）；
+//   top/height＝整個泳道帶（.board__lanes）的上下界。
+// 覆蓋層置於捲動容器之外（不被裁切、不隨內容捲動），量測在 .rotation-board 本地
+// 座標系完成 → 螢幕固定。捲動時（初次置中平滑捲動、手動滾輪）幽靈格會移動，
+// 故掛 scroll 監聽 rAF 重量測讓直柱跟隨；輸送帶動畫中幽靈格螢幕不動、重量測結果不變。
+const ghostBar = ref<{ left: number; top: number; height: number; width: number } | null>(null)
+
+// ── 直柱平滑移動：JS 補間（涵蓋所有位移來源：切泳道／捲動跟隨／靠左極限位移）。
+// 時長隨移動距離縮放（近＝快、遠＝稍慢），統一手感；捲動跟隨的每幀小位移
+// 會落在最短時長，形成柔和的貼身跟隨。
+let _barTween: number | null = null
+
+function setGhostBarTarget(t: { left: number; top: number; width: number; height: number }): void {
+  const cur = ghostBar.value
+  // 首次出現／減少動態：直接落位不補間。
+  if (!cur || prefersReducedMotion()) {
+    if (_barTween !== null) {
+      cancelAnimationFrame(_barTween)
+      _barTween = null
+    }
+    ghostBar.value = t
+    return
+  }
+  const dist = Math.hypot(t.left - cur.left, t.top - cur.top)
+  const sizeDelta = Math.abs(t.width - cur.width) + Math.abs(t.height - cur.height)
+  if (dist < 0.5 && sizeDelta < 0.5) return // 位置沒變（輸送帶動畫中幽靈格螢幕固定）
+  if (_barTween !== null) cancelAnimationFrame(_barTween)
+  // 時長＝基準 80ms + 距離加成，封頂 360ms（跨三泳道／長距離也不拖沓）。
+  const dur = Math.min(80 + dist * 0.6, 360)
+  const from = { ...cur }
+  const t0 = performance.now()
+  const easeOut = (p: number): number => 1 - (1 - p) ** 3
+  const step = (now: number): void => {
+    const p = Math.min((now - t0) / dur, 1)
+    const e = easeOut(p)
+    ghostBar.value = {
+      left: from.left + (t.left - from.left) * e,
+      top: from.top + (t.top - from.top) * e,
+      width: from.width + (t.width - from.width) * e,
+      height: from.height + (t.height - from.height) * e,
+    }
+    _barTween = p < 1 ? requestAnimationFrame(step) : null
+  }
+  _barTween = requestAnimationFrame(step)
+}
+
+/** 量測幽靈格與泳道帶位置，換算為 .rotation-board 本地座標驅動直柱；任一缺失則隱藏。 */
+/** 隱藏直柱：取消進行中的補間（否則補間下一幀會把 null 蓋回舊值）。 */
+function hideGhostBar(): void {
+  if (_barTween !== null) {
+    cancelAnimationFrame(_barTween)
+    _barTween = null
+  }
+  ghostBar.value = null
+}
+
+function measureGhostBar(): void {
+  if (!hotkeyMode.active.value) {
+    hideGhostBar()
+    return
+  }
+  const board = rotationBoardRef.value
+  const ghost = board?.querySelector<HTMLElement>('.track__ghost-cell')
+  const lanes = board?.querySelector<HTMLElement>('.board__lanes')
+  if (!board || !ghost || !lanes) {
+    hideGhostBar()
+    return
+  }
+  const boardRect = board.getBoundingClientRect()
+  const ghostRect = ghost.getBoundingClientRect()
+  const lanesRect = lanes.getBoundingClientRect()
+  // 直柱左右各比幽靈格外擴一段：軌條不壓在幽靈格邊框上，框「欄」而非框「格」。
+  const GHOST_BAR_PAD_X = 10
+  setGhostBarTarget({
+    left: ghostRect.left - boardRect.left - GHOST_BAR_PAD_X,
+    width: ghostRect.width + GHOST_BAR_PAD_X * 2,
+    top: lanesRect.top - boardRect.top,
+    height: lanesRect.height,
+  })
+}
+
+// rAF 節流的重量測（捲動事件高頻，合併到下一幀量一次）。
+let _ghostBarRaf: number | null = null
+function scheduleMeasureGhostBar(): void {
+  if (_ghostBarRaf !== null) return
+  _ghostBarRaf = requestAnimationFrame(() => {
+    _ghostBarRaf = null
+    measureGhostBar()
+  })
+}
+
+// 觸發重量測：模式開關／切泳道（幽靈格於新泳道重建）／增刪（輸送帶捲動）／
+// controlsReady（進場側欄收合＋初次置中完成）。flush post + rAF 讓 DOM 與首幀就位。
+watch(
+  [
+    () => hotkeyMode.active.value,
+    () => hotkeyMode.controlsReady.value,
+    () => rotationStore.selectedLaneIndex,
+    () => rotationStore.entries.length,
+  ],
+  () => scheduleMeasureGhostBar(),
+  { flush: 'post' },
+)
+
+// 直柱的檢視隱藏：直讀 hotkeyMode.inspecting 顯式狀態（Shift＋滾輪置 true、
+// 落子／刪除／undo 置 false）——不從 scroll 事件推測來源（heuristic 不可靠）。
+// 進入檢視：把直柱「克隆一份釘在原螢幕位置淡出」（比照刪除的 _playDeleteGhost），
+// 隨即即刻移除真身——淡出與版面/捲動脫鉤，捲動時克隆穩穩釘在原地淡掉、不跟著跑。
+// 退出檢視：於歸位後的新位置重量測，真身以進場淡入重新現身。
+const ghostBarRef = ref<HTMLElement | null>(null)
+const GHOST_BAR_FADE_MS = 400
+
+function playGhostBarFadeClone(): void {
+  if (prefersReducedMotion()) return
+  const bar = ghostBarRef.value
+  if (!bar) return
+  const rect = bar.getBoundingClientRect()
+  const clone = bar.cloneNode(true) as HTMLElement
+  clone.classList.remove('ghost-focus-bar--delete') // 不帶刪除閃紅
+  clone.classList.add('ghost-focus-bar--fade-clone') // 覆蓋為 fixed 定位＋淡出動畫
+  // 用 fixed 螢幕座標釘住（原本是 .rotation-board 本地座標的 absolute）。
+  clone.style.left = `${rect.left}px`
+  clone.style.top = `${rect.top}px`
+  clone.style.width = `${rect.width}px`
+  clone.style.height = `${rect.height}px`
+  document.body.appendChild(clone)
+  // 「跟著輸送帶走」：進入檢視是靠 Shift＋滾輪橫向捲動內容，克隆須黏在原本框住的
+  // 幽靈欄上、隨內容一起滑走再淡掉——而非釘死在視窗中央讓內容從底下溜過（那會使
+  // 淡出與它框的欄脫節）。做法：淡出期間每幀把克隆平移 −(捲距增量)，恰抵銷內容位移。
+  const scroll = boardScrollRef.value
+  const startScrollLeft = scroll?.scrollLeft ?? 0
+  let cloneRaf: number | null = null
+  const followBelt = (): void => {
+    if (!scroll) return
+    clone.style.transform = `translateX(${-(scroll.scrollLeft - startScrollLeft)}px)`
+  }
+  const onScroll = (): void => {
+    if (cloneRaf !== null) return // rAF 節流：高頻 scroll 合併到下一幀量一次
+    cloneRaf = requestAnimationFrame(() => {
+      cloneRaf = null
+      followBelt()
+    })
+  }
+  scroll?.addEventListener('scroll', onScroll, { passive: true })
+  window.setTimeout(() => {
+    scroll?.removeEventListener('scroll', onScroll)
+    if (cloneRaf !== null) cancelAnimationFrame(cloneRaf)
+    clone.remove()
+  }, GHOST_BAR_FADE_MS)
+}
+
+watch(
+  () => hotkeyMode.inspecting.value,
+  (inspecting) => {
+    if (inspecting) {
+      playGhostBarFadeClone() // 先克隆淡出（釘原位）
+      hideGhostBar() // 再即刻移除真身
+    } else if (hotkeyMode.active.value) {
+      scheduleMeasureGhostBar()
+    }
+  },
+)
+
+// scroll／resize：重量測讓直柱跟隨（檢視中直柱已移除，跳過）。
+function onGhostBarReflow(): void {
+  if (hotkeyMode.active.value && !hotkeyMode.inspecting.value) scheduleMeasureGhostBar()
+}
+
+// ── 直柱刪除閃紅：熱鍵刪除時紅色樣式快速淡入淡出一次（::after 疊層動畫）。
+// 先關再下一幀開＝重置 CSS animation，連刪每次都重播。
+const ghostBarDeleteFlash = ref(false)
+let _flashTimer: number | null = null
+watch(
+  () => hotkeyMode.deleteFlashTick.value,
+  () => {
+    ghostBarDeleteFlash.value = false
+    if (_flashTimer !== null) clearTimeout(_flashTimer)
+    requestAnimationFrame(() => {
+      ghostBarDeleteFlash.value = true
+    })
+    _flashTimer = window.setTimeout(() => {
+      ghostBarDeleteFlash.value = false
+      _flashTimer = null
+    }, 400)
+  },
+)
+
+onMounted(() => {
+  // 捲動時幽靈格若移動（初次置中平滑捲動）→ 直柱跟隨；resize 亦重量測。
+  boardScrollRef.value?.addEventListener('scroll', onGhostBarReflow, { passive: true })
+  window.addEventListener('resize', onGhostBarReflow)
+})
+onBeforeUnmount(() => {
+  boardScrollRef.value?.removeEventListener('scroll', onGhostBarReflow)
+  window.removeEventListener('resize', onGhostBarReflow)
+  if (_ghostBarRaf !== null) cancelAnimationFrame(_ghostBarRaf)
+  if (_barTween !== null) cancelAnimationFrame(_barTween)
+  if (_flashTimer !== null) clearTimeout(_flashTimer)
+})
 
 // ── 泳道垂直拖曳（R5 抽離至 useLaneReorder）──────────────────
 const rotationBoardRef = ref<HTMLElement | null>(null)
@@ -473,6 +684,23 @@ onMounted(() => {
         <div class="board__end-spacer" :[NEUTRAL_ZONE_ATTRIBUTE]="true" aria-hidden="true" />
       </div>
     </div>
+
+    <!-- 熱鍵輸入模式垂直焦點框（R4）：貫穿三泳道、框住幽靈欄的直柱（節奏遊戲判定列）。
+         覆蓋層置於捲動容器之外→不被裁切、不隨內容捲動；位置由 measureGhostBar 驅動。
+         pointer-events 穿透，不擋任何互動。 -->
+    <div
+      v-if="ghostBar && hotkeyMode.active.value"
+      ref="ghostBarRef"
+      class="ghost-focus-bar"
+      :class="{ 'ghost-focus-bar--delete': ghostBarDeleteFlash }"
+      :style="{
+        left: ghostBar.left + 'px',
+        top: ghostBar.top + 'px',
+        width: ghostBar.width + 'px',
+        height: ghostBar.height + 'px',
+      }"
+      aria-hidden="true"
+    />
 
     <!-- 泳道拖曳浮起分身：橫向滿版的帶狀，跟游標垂直移動 -->
     <div
@@ -556,6 +784,96 @@ onMounted(() => {
   position: relative;
 }
 
+/* ── 熱鍵輸入模式垂直焦點框（R4）──────────────────────────────
+   貫穿三泳道、框住幽靈欄的直柱：兩側青色軌條＋淡青填色（節奏遊戲判定列語彙）。
+   位置由 measureGhostBar 以 inline style 驅動（.rotation-board 本地座標，螢幕固定）。
+   pointer-events 穿透；淡入登場；left/top/height 過渡讓切泳道・捲動跟隨平滑。 */
+.ghost-focus-bar {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  /* 琥珀色（沿用熱鍵模式既有的 251,191,36 語彙）：暖色與幽靈格的青色區隔開，
+     直柱＝欄高亮、幽靈格＝落點，不同色系才不會糊成一片。 */
+  border-left: 2px solid rgba(251, 191, 36, 0.6);
+  border-right: 2px solid rgba(251, 191, 36, 0.6);
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    rgba(251, 191, 36, 0.14),
+    rgba(251, 191, 36, 0.05) 50%,
+    rgba(251, 191, 36, 0.14)
+  );
+  box-shadow: 0 0 12px 0 rgba(251, 191, 36, 0.2);
+  pointer-events: none;
+  animation: ghost-focus-bar-in 160ms ease-out both;
+  /* 位移不用 CSS transition：所有移動（切泳道／捲動跟隨／靠左極限）由 JS 補間
+     驅動（setGhostBarTarget，時長隨距離縮放），CSS 過渡會與其疊加出拖影。 */
+}
+/* 進入檢視時的離場克隆（playGhostBarFadeClone 動態產生於 <body>）：
+   fixed 定位起於原螢幕位置，淡出期間由 JS 每幀平移 −(捲距增量) 跟著輸送帶
+   一起滑走（黏在原本框住的幽靈欄上），而非釘死在視窗讓內容從底下溜過。
+   覆蓋 .ghost-focus-bar 的 absolute 定位與進場動畫。 */
+.ghost-focus-bar--fade-clone {
+  position: fixed;
+  z-index: 10000;
+  margin: 0;
+  animation: ghost-bar-fade-clone-leave 0.4s ease forwards;
+}
+@keyframes ghost-bar-fade-clone-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ghost-focus-bar-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 刪除閃紅疊層：熱鍵刪除瞬間整柱亮紅一次（前 1/5 快進、其餘緩出）。
+   飽滿紅填色＋粗亮紅軌條＋紅光暈，明顯壓過底層琥珀；疊在 ::after，
+   動畫結束自動回到原琥珀，無殘留狀態。 */
+.ghost-focus-bar::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-left: 3px solid rgb(248, 113, 113);
+  border-right: 3px solid rgb(248, 113, 113);
+  border-radius: inherit;
+  background: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 18px 2px rgba(239, 68, 68, 0.7);
+  opacity: 0;
+}
+.ghost-focus-bar--delete::after {
+  animation: ghost-bar-delete-flash 380ms ease-out;
+}
+@keyframes ghost-bar-delete-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost-focus-bar {
+    animation: none;
+  }
+  .ghost-focus-bar--delete::after {
+    animation: none;
+  }
+}
+
 /* ── 共用水平捲動容器 ──────────────────────────────────────── */
 .board__scroll {
   flex: 1;
@@ -569,6 +887,11 @@ onMounted(() => {
   /* 宣告為容器查詢容器：讓尾端留白與泳道最小寬能以 cqw（可視寬度）定尺寸，
      捲動內容再寬，cqw 仍以「可視視窗寬」為基準（scrollWidth 不影響）。 */
   container-type: inline-size;
+  /* 尾端留白寬（單一事實來源：留白佔位與泳道焦點環 right 共用）。
+     50cqw＝可視寬一半；+44px＝收合側欄細軌寬（AppLayout COLLAPSED_RAIL_WIDTH）——
+     熱鍵模式幽靈格以「整個視窗」為置中基準，視窗中心比軌道區中心偏左約
+     半個細軌寬，須多留這些捲動空間才不會被 maxScrollLeft 夾住而偏右。 */
+  --board-end-spacer: calc(50cqw + 44px);
 }
 
 /* 橫向內容列：泳道群（撐滿可視寬、可再被內容撐寬）＋ 尾端留白佔位。 */
@@ -582,12 +905,12 @@ onMounted(() => {
 
 /* ── 泳道選取焦點環（W/S 巡覽）────────────────────────────────
    視覺沿用原 .swimlane--lane-selected（青色邊框＋淡底＋內輝光），改為單一
-   覆蓋層以便在泳道間平滑滑動。右緣內縮 50cqw＝扣掉尾端留白，恰貼齊泳道
+   覆蓋層以便在泳道間平滑滑動。右緣內縮尾端留白寬（共用變數），恰貼齊泳道
    群右緣；pointer-events 穿透不擋任何互動。 */
 .lane-focus-ring {
   position: absolute;
   left: 0;
-  right: 50cqw;
+  right: var(--board-end-spacer);
   pointer-events: none;
   /* 滑動補間刻意用 top 而非 transform：transform 會使本體形成 stacking
      context，把 ::after 的 z-index 困在內、永遠壓不過 header（z:5）。
@@ -649,7 +972,7 @@ onMounted(() => {
    純佔位、不可互動：掛 data-neutral-zone（拖曳鬆手一律彈回，非落點非刪除區），
    無任何視覺（透明），高度隨 flex stretch 貼齊三泳道帶。 */
 .board__end-spacer {
-  flex: 0 0 50cqw;
+  flex: 0 0 var(--board-end-spacer);
 }
 
 /* 泳道拖曳進行中：整個面板游標呈抓取態 */

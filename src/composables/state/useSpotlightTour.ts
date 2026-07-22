@@ -39,6 +39,7 @@ import {
   removeHotkeyLaneProxy,
 } from '@/composables/state/useTourDemo';
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode';
+import { computeCenterScrollLeft } from '@/composables/board/useBoardScroll';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
 import type { HotkeyMapEntry, IntroHotkeyEntry } from '@/types/hotkey';
 import type { CharacterSlots, SlotIndex } from '@/types/character';
@@ -220,20 +221,22 @@ function resetDemoBoard(): void {
   templateStore.templates = [];
   rotationStore.clearSelection();
   rotationStore.stopEditing();
-  // 熱鍵導覽變體：側欄開合由模式自己管（進入收合/退出還原），分頁與側欄不動。
+  // 熱鍵導覽變體：側欄開合由模式自己管（進入收合/退出還原），分頁與側欄不動；
+  // 捲動位置也不動——由幽靈格置中（enter()/useGhostConveyor）全權掌管，
+  // 若在此歸零會與置中捲動互搶、每次進入步驟都把軸面猛拉一次。
   if (variant === 'main') {
     // 側邊欄一律保持展開（步驟 2/4 需要）：避免任何步驟殘留的收合狀態影響後續步驟。
     useSidebarCollapse().collapsed.value = false;
     // 側邊欄分頁重設回預設「通用」：避免 n2 切到「自訂」的分頁殘留到後續步驟。
     clickTab('tab-general');
+    // 水平捲動歸零：使 spotlight 邊框左緣與泳道 header 左緣對齊。前一步（n5 貼上/復原）
+    // 會把 board 捲到最右端，導致 .board__lanes 左緣被捲出視窗外，step8 的高亮框左緣
+    // 因而與 sticky 定位的泳道 header 左緣錯開。於 post-render 歸零讓兩者對齊。
+    nextTick(() => {
+      const scroll = document.querySelector<HTMLElement>('.board__scroll');
+      if (scroll) scroll.scrollLeft = 0;
+    });
   }
-  // 水平捲動歸零：使 spotlight 邊框左緣與泳道 header 左緣對齊。前一步（n5 貼上/復原）
-  // 會把 board 捲到最右端，導致 .board__lanes 左緣被捲出視窗外，step8 的高亮框左緣
-  // 因而與 sticky 定位的泳道 header 左緣錯開。於 post-render 歸零讓兩者對齊。
-  nextTick(() => {
-    const scroll = document.querySelector<HTMLElement>('.board__scroll');
-    if (scroll) scroll.scrollLeft = 0;
-  });
 }
 
 /** 還原導覽開始前的版面。 */
@@ -475,7 +478,9 @@ export function useSpotlightTour() {
     // 讓 hk1 的示範統一走「主動進入模式」的乾淨路徑。
     if (variant === 'hotkey') useHotkeyInputMode().exit();
 
-    injectDemo();
+    // 熱鍵導覽的示範資料延後注入（見下方 hotkey 分支）：注入會改變 scrollWidth，
+    // 必須等側欄收合定型後與瞬間置中同幀完成，否則會先看到夾回/位移。
+    if (variant === 'main') injectDemo();
     const sidebar = useSidebarCollapse();
     sidebarWasCollapsed = sidebar.collapsed.value;
     if (variant === 'main') {
@@ -532,15 +537,32 @@ export function useSpotlightTour() {
     TOUR_BLOCK_EVENTS.forEach((e) => window.addEventListener(e, onTourBlockInput, true));
 
     if (variant === 'hotkey') {
-      // 熱鍵導覽 step 1：先進入模式，等側欄收合過渡（0.25s）定型後才 drive。
-      // 這樣「首次」spotlight 就直接落在收合後的正確泳道矩形，不會先套在展開版面
-      // 再跳位；drive 之後 demoHotkey1 才開始送出按鍵輸入。
-      useHotkeyInputMode().enter();
+      // 熱鍵導覽 step 1 的進場順序（防抖動的關鍵）：
+      //   1) 先「只收合側欄」——畫面上仍是使用者自己的軸面，配一段正常的收合過渡。
+      //   2) 等版面定型後，才在「同一幀」內：注入示範資料 → 進入模式 → 瞬間置中
+      //      幽靈格 → 重算代理框 → drive。注入造成的 scrollWidth 縮短（夾回）與
+      //      置中在首繪前一次到位，量測也都以「最終版面」為準——不會先看到
+      //      尾端區塊貼左緣、再整片猛移，spotlight 也不跳位。
+      //   （若側欄本就收合，無過渡可等 → 延遲 0 立即進行。）
+      const needCollapse = !sidebar.collapsed.value;
+      sidebar.collapsed.value = true;
       window.setTimeout(() => {
         if (!isActive.value || !driverObj) return;
-        syncHotkeyLaneProxy(); // 以收合後的可視泳道範圍重算代理框
-        driverObj.drive();      // onHighlighted → runDemo('hk1')
-      }, HOTKEY_LAYOUT_SETTLE_MS);
+        injectDemo();
+        // 側欄已收合 → enter() 內的收合為 no-op、無新過渡；其 300ms 後的平滑置中
+        // 與下方瞬間置中目標相同，僅作保險校正（距離≈0，看不出移動）。
+        useHotkeyInputMode().enter();
+        void nextTick(() => {
+          if (!isActive.value || !driverObj) return;
+          const ghost = document.querySelector<HTMLElement>('.track__ghost-cell');
+          const scroll = document.querySelector<HTMLElement>('.board__scroll');
+          if (ghost && scroll) {
+            scroll.scrollLeft = computeCenterScrollLeft(ghost, scroll, 'viewport');
+          }
+          syncHotkeyLaneProxy(); // 以收合後的可視泳道範圍重算代理框
+          driverObj.drive(); // onHighlighted → runDemo('hk1')
+        });
+      }, needCollapse ? HOTKEY_LAYOUT_SETTLE_MS : 0);
     } else {
       // 等示範資料渲染出泳道/區塊元件後再啟動定位。
       nextTick(() => driverObj?.drive());
