@@ -170,9 +170,17 @@ function onBackdropClick(): void {
   handleClose()
 }
 
-/** 關閉視窗：一併結束擷取。 */
+/** 清掉未完成條目：缺 label（全空白）或缺鍵位者視為半成品，離開設定頁時一併移除。
+ *  入場技捷徑不受影響（鍵位鎖定、另存一區）。 */
+function pruneIncompleteEntries(): void {
+  const incomplete = entries.value.filter((e) => e.label.trim() === '' || !e.hotkey)
+  for (const e of incomplete) removeEntry(e.id)
+}
+
+/** 關閉視窗：一併結束擷取，並清掉未完成條目。 */
 function handleClose(): void {
   stopCapture()
+  pruneIncompleteEntries()
   close()
 }
 
