@@ -61,6 +61,11 @@ let _holdTimer: number | null = null;
 // 刪除訊號（遞增計數）：每次熱鍵刪除 +1，驅動垂直焦點框直柱閃紅一次
 // （RotationBoard watch 此值；用計數而非 boolean 讓連刪能重複觸發）。
 const _deleteFlashTick = ref(0);
+// 檢視模式（Shift＋滾輪捲動檢視站位）：顯式狀態機——Shift 滾動置 true、
+// 插入／刪除／undo（會重新置中的操作）置 false。true 期間：直柱隱藏
+// （RotationBoard）、切泳道不觸發輸送帶捲動（useGhostConveyor）。
+// 不用 scroll 事件來源推測（程式化與使用者捲動無法可靠區分，heuristic 已證不穩）。
+const _inspecting = ref(false);
 // 剛以熱鍵插入的區塊 id：驅動 RotationBlock 播一次「落下吸附」進場動畫（§3.2）。
 // 動畫播畢即清（一次性）；下次插入覆蓋為新 id。
 const _enteringId = ref<string | null>(null);
@@ -115,6 +120,7 @@ export function useHotkeyInputMode() {
     if (active.value) return;
     if (selectableLanes.value.length === 0) return; // 無任何角色可插入 → 模式無意義，不進入
     active.value = true;
+    _inspecting.value = false; // 進場重置檢視狀態
     controlsReady.value = false; // 進場先隱藏控制列，待版面定型後再顯示
     ensureLaneSelected(rotationStore.selectedLaneIndex);
     // 自動收合側邊欄爭取軸面寬度；退出時還原原本的收合狀態。
@@ -143,6 +149,7 @@ export function useHotkeyInputMode() {
     flushTapBuffer(); // 待合併內容先結算落子，再退出（不丟輸入）
     active.value = false;
     paused.value = false;
+    _inspecting.value = false;
     controlsReady.value = false;
     _pressStartAt.clear(); // 清掉未放開的按壓，避免下次進入誤判
     _pressingHotkey.value = null;
@@ -156,6 +163,7 @@ export function useHotkeyInputMode() {
     const slot = laneOrder.value[displayIndex];
     if (slot === undefined) return false;
     if (!selectableLanes.value.includes(slot)) return false;
+    _inspecting.value = false; // 移動幽靈格＝結束檢視（conveyor 於此歸位重新置中、直柱淡回）
     flushTapBuffer(); // 切泳道前先結算待合併內容（落在原泳道）
     rotationStore.selectLane(slot);
     return true;
@@ -167,12 +175,14 @@ export function useHotkeyInputMode() {
     if (lanes.length === 0) return;
     const idx = lanes.indexOf(rotationStore.selectedLaneIndex as SlotIndex);
     const next = idx === -1 ? 0 : (idx + direction + lanes.length) % lanes.length;
+    _inspecting.value = false; // 移動幽靈格＝結束檢視（conveyor 於此歸位重新置中、直柱淡回）
     flushTapBuffer(); // 切泳道前先結算待合併內容（落在原泳道）
     rotationStore.selectLane(lanes[next]);
   }
 
   /** 把一段文字作為新區塊插入選中泳道末尾（＝1D 陣列末尾）。 */
   function insertLabel(label: string): void {
+    _inspecting.value = false; // 落子＝結束檢視（conveyor 於 entries 變化時重新置中）
     const lane = rotationStore.selectedLaneIndex;
     if (lane === null) return;
     const character = characterStore.slots[lane].character;
@@ -337,6 +347,7 @@ export function useHotkeyInputMode() {
 
   /** 刪除全時間軸的最後一個區塊（不分泳道；節奏遊戲式「倒帶一格」，幽靈格僅為插入指示）。 */
   function deleteLastBlock(): void {
+    _inspecting.value = false; // 刪除＝結束檢視（conveyor 於 entries 變化時重新置中）
     flushTapBuffer(); // 先結算待合併內容再刪（刪除語意以已落子的末塊為準）
     const last = rotationStore.entries[rotationStore.entries.length - 1];
     if (last) {
@@ -364,6 +375,7 @@ export function useHotkeyInputMode() {
         // undo/redo 套用快照後會清空所有選取（useHistory._apply 防懸空參照），
         // 模式的泳道選取須自行補回：記住套用前的泳道、事後收斂補選。
         const laneBefore = rotationStore.selectedLaneIndex;
+        _inspecting.value = false; // undo/redo＝結束檢視
         flushTapBuffer(); // 待合併內容先結算成一步，undo 語意才乾淨
         if (k === 'y' || event.shiftKey) history.redo();
         else history.undo();
@@ -462,6 +474,7 @@ export function useHotkeyInputMode() {
     tapCombineLabel,
     enteringId,
     deleteFlashTick: _deleteFlashTick,
+    inspecting: _inspecting,
     selectableLanes,
     enter,
     exit,

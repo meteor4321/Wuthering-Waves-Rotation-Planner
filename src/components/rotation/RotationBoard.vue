@@ -524,8 +524,68 @@ watch(
   { flush: 'post' },
 )
 
+// 直柱的檢視隱藏：直讀 hotkeyMode.inspecting 顯式狀態（Shift＋滾輪置 true、
+// 落子／刪除／undo 置 false）——不從 scroll 事件推測來源（heuristic 不可靠）。
+// 進入檢視：把直柱「克隆一份釘在原螢幕位置淡出」（比照刪除的 _playDeleteGhost），
+// 隨即即刻移除真身——淡出與版面/捲動脫鉤，捲動時克隆穩穩釘在原地淡掉、不跟著跑。
+// 退出檢視：於歸位後的新位置重量測，真身以進場淡入重新現身。
+const ghostBarRef = ref<HTMLElement | null>(null)
+const GHOST_BAR_FADE_MS = 400
+
+function playGhostBarFadeClone(): void {
+  if (prefersReducedMotion()) return
+  const bar = ghostBarRef.value
+  if (!bar) return
+  const rect = bar.getBoundingClientRect()
+  const clone = bar.cloneNode(true) as HTMLElement
+  clone.classList.remove('ghost-focus-bar--delete') // 不帶刪除閃紅
+  clone.classList.add('ghost-focus-bar--fade-clone') // 覆蓋為 fixed 定位＋淡出動畫
+  // 用 fixed 螢幕座標釘住（原本是 .rotation-board 本地座標的 absolute）。
+  clone.style.left = `${rect.left}px`
+  clone.style.top = `${rect.top}px`
+  clone.style.width = `${rect.width}px`
+  clone.style.height = `${rect.height}px`
+  document.body.appendChild(clone)
+  // 「跟著輸送帶走」：進入檢視是靠 Shift＋滾輪橫向捲動內容，克隆須黏在原本框住的
+  // 幽靈欄上、隨內容一起滑走再淡掉——而非釘死在視窗中央讓內容從底下溜過（那會使
+  // 淡出與它框的欄脫節）。做法：淡出期間每幀把克隆平移 −(捲距增量)，恰抵銷內容位移。
+  const scroll = boardScrollRef.value
+  const startScrollLeft = scroll?.scrollLeft ?? 0
+  let cloneRaf: number | null = null
+  const followBelt = (): void => {
+    if (!scroll) return
+    clone.style.transform = `translateX(${-(scroll.scrollLeft - startScrollLeft)}px)`
+  }
+  const onScroll = (): void => {
+    if (cloneRaf !== null) return // rAF 節流：高頻 scroll 合併到下一幀量一次
+    cloneRaf = requestAnimationFrame(() => {
+      cloneRaf = null
+      followBelt()
+    })
+  }
+  scroll?.addEventListener('scroll', onScroll, { passive: true })
+  window.setTimeout(() => {
+    scroll?.removeEventListener('scroll', onScroll)
+    if (cloneRaf !== null) cancelAnimationFrame(cloneRaf)
+    clone.remove()
+  }, GHOST_BAR_FADE_MS)
+}
+
+watch(
+  () => hotkeyMode.inspecting.value,
+  (inspecting) => {
+    if (inspecting) {
+      playGhostBarFadeClone() // 先克隆淡出（釘原位）
+      hideGhostBar() // 再即刻移除真身
+    } else if (hotkeyMode.active.value) {
+      scheduleMeasureGhostBar()
+    }
+  },
+)
+
+// scroll／resize：重量測讓直柱跟隨（檢視中直柱已移除，跳過）。
 function onGhostBarReflow(): void {
-  if (hotkeyMode.active.value) scheduleMeasureGhostBar()
+  if (hotkeyMode.active.value && !hotkeyMode.inspecting.value) scheduleMeasureGhostBar()
 }
 
 // ── 直柱刪除閃紅：熱鍵刪除時紅色樣式快速淡入淡出一次（::after 疊層動畫）。
@@ -548,7 +608,7 @@ watch(
 )
 
 onMounted(() => {
-  // 捲動時幽靈格若移動（初次置中平滑捲動、手動滾輪）→ 直柱跟隨；resize 亦重量測。
+  // 捲動時幽靈格若移動（初次置中平滑捲動）→ 直柱跟隨；resize 亦重量測。
   boardScrollRef.value?.addEventListener('scroll', onGhostBarReflow, { passive: true })
   window.addEventListener('resize', onGhostBarReflow)
 })
@@ -630,6 +690,7 @@ onMounted(() => {
          pointer-events 穿透，不擋任何互動。 -->
     <div
       v-if="ghostBar && hotkeyMode.active.value"
+      ref="ghostBarRef"
       class="ghost-focus-bar"
       :class="{ 'ghost-focus-bar--delete': ghostBarDeleteFlash }"
       :style="{
@@ -747,6 +808,24 @@ onMounted(() => {
   animation: ghost-focus-bar-in 160ms ease-out both;
   /* 位移不用 CSS transition：所有移動（切泳道／捲動跟隨／靠左極限）由 JS 補間
      驅動（setGhostBarTarget，時長隨距離縮放），CSS 過渡會與其疊加出拖影。 */
+}
+/* 進入檢視時的離場克隆（playGhostBarFadeClone 動態產生於 <body>）：
+   fixed 定位起於原螢幕位置，淡出期間由 JS 每幀平移 −(捲距增量) 跟著輸送帶
+   一起滑走（黏在原本框住的幽靈欄上），而非釘死在視窗讓內容從底下溜過。
+   覆蓋 .ghost-focus-bar 的 absolute 定位與進場動畫。 */
+.ghost-focus-bar--fade-clone {
+  position: fixed;
+  z-index: 10000;
+  margin: 0;
+  animation: ghost-bar-fade-clone-leave 0.4s ease forwards;
+}
+@keyframes ghost-bar-fade-clone-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 @keyframes ghost-focus-bar-in {
   from {

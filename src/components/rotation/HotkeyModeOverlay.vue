@@ -33,10 +33,58 @@ const currentLaneName = computed<string>(() => {
   return characterDisplayName(characterStore.slots[lane].character)
 })
 
-// 滾輪：上一條/下一條已選角泳道（循環）。preventDefault 徵用捲動。
+// 檢視捲動（Shift＋滾輪）的 rAF 平滑補間狀態：累積目標捲距，每幀朝目標
+// 緩動逼近，把「一格一格跳」的離散滾輪化為連續平滑捲動。
+let _inspectTarget = 0
+let _inspectRaf: number | null = null
+
+function _inspectStep(scroll: HTMLElement): void {
+  const cur = scroll.scrollLeft
+  const diff = _inspectTarget - cur
+  if (Math.abs(diff) < 0.5) {
+    scroll.scrollLeft = _inspectTarget
+    _inspectRaf = null
+    return
+  }
+  scroll.scrollLeft = cur + diff * 0.22 // 每幀補 22% → 指數緩動貼近目標
+  _inspectRaf = requestAnimationFrame(() => _inspectStep(scroll))
+}
+
+/** 立即取消檢視捲動補間（一般滾輪／落子刪除歸位時呼叫，殘留補間不可再動畫布）。 */
+function _cancelInspectTween(): void {
+  if (_inspectRaf !== null) {
+    cancelAnimationFrame(_inspectRaf)
+    _inspectRaf = null
+  }
+}
+
+// 檢視狀態轉 false（落子／刪除／undo → conveyor 要接手歸位捲動）：
+// 先取消殘留補間，避免兩套動畫爭搶 scrollLeft。
+watch(() => hotkeyMode.inspecting.value, (inspecting) => {
+  if (!inspecting) _cancelInspectTween()
+})
+
+// 滾輪：
+//   - Shift＋滾輪：進入「檢視」狀態（inspecting=true，直柱隱藏、切泳道不觸發輸送帶），
+//     橫向平滑捲動主軸供使用者檢視站位。下次落子／刪除時 conveyor 重新置中歸位。
+//   - 一般滾輪：上一條/下一條已選角泳道（循環）——只切幽靈格所在泳道，不捲畫布
+//     （檢視中殘留的捲動補間會被上方 watch／此處防呆取消）。
+// 皆 preventDefault 徵用預設捲動。
 function handleWheel(event: WheelEvent): void {
   event.preventDefault()
+  if (event.shiftKey) {
+    const scroll = document.querySelector<HTMLElement>('.board__scroll')
+    if (!scroll) return
+    hotkeyMode.inspecting.value = true // 顯式進入檢視狀態（直柱隱藏由 RotationBoard 讀此值）
+    // 累加到目標（連續滾動會疊加）；夾在合法捲動範圍內。
+    const max = scroll.scrollWidth - scroll.clientWidth
+    const base = _inspectRaf !== null ? _inspectTarget : scroll.scrollLeft
+    _inspectTarget = Math.max(0, Math.min(base + event.deltaY, max))
+    if (_inspectRaf === null) _inspectRaf = requestAnimationFrame(() => _inspectStep(scroll))
+    return
+  }
   if (event.deltaY === 0) return
+  _cancelInspectTween() // 防呆：一般滾輪不得延續檢視補間捲動畫布
   hotkeyMode.cycleLane(event.deltaY > 0 ? 1 : -1)
 }
 
@@ -82,6 +130,7 @@ onUnmounted(() => {
   window.removeEventListener('wheel', handleWheel)
   window.removeEventListener('blur', hotkeyMode.pause)
   window.removeEventListener('focus', hotkeyMode.resume)
+  _cancelInspectTween()
 })
 
 // 切換輸出軸分頁 = 視同退出模式。

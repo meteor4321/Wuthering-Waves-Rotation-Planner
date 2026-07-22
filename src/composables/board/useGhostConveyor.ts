@@ -20,7 +20,8 @@
 //     置中位置，不會先閃現在未補償的位置。
 //   - 左端極限（區塊太少、scrollLeft clamp 到 0）：幽靈格自然靠左，屬預期
 //     行為;右端由既有的尾端墊片（半螢幕寬）保證恆有置中空間。
-//   - 觸發源：選中泳道（垂直）／entries 數（落子・刪除）。僅模式啟用中作用。
+//   - 觸發源：選中泳道（垂直）／entries 數（落子・刪除）／inspecting（結束檢視
+//     歸位）。僅模式啟用中作用。
 //
 // 由 RotationBoard setup 呼叫一次；watcher 隨元件卸載自動清理。
 // ============================================================
@@ -46,11 +47,26 @@ export function useGhostConveyor(): void {
   let _rafId: number | null = null;
 
   watch(
-    // 觸發源：選中泳道（垂直）／entries 數（落子・刪除）。合併預顯文字不再是
-    // 觸發源——R3 後預顯外置、幽靈格固定正方，文字長度不影響置中。
-    () => [rotationStore.selectedLaneIndex, rotationStore.entries.length],
+    // 觸發源：選中泳道（垂直）／entries 數（落子・刪除）／inspecting（結束檢視歸位）。
+    // 合併預顯文字不再是觸發源——R3 後預顯外置、幽靈格固定正方，文字長度不影響置中。
+    // inspecting 納入觸發源，是為了涵蓋「檢視中切到同一泳道」（單泳道滾輪、或按下
+    // 當前泳道號）這類 selectedLaneIndex 不變的情形——靠 inspecting 由 true→false
+    // 這個轉變單獨觸發歸位捲動，避免直柱淡回卻沒重新置中。
+    () => [
+      rotationStore.selectedLaneIndex,
+      rotationStore.entries.length,
+      hotkeyMode.inspecting.value,
+    ],
     () => {
       if (!hotkeyMode.active.value) {
+        _lastRect = null;
+        return;
+      }
+      // inspecting 為 true 只有「Shift＋滾輪進入檢視」這一途（該操作不改泳道／entries，
+      // 本 watcher 僅因 inspecting 由 false→true 而觸發）→ 早退，檢視捲動保持自由。
+      // 所有「結束檢視」的操作（切泳道／落子／刪除／undo）都同步先把 inspecting 置回
+      // false，故走到下方歸位捲動、不被此擋。
+      if (hotkeyMode.inspecting.value) {
         _lastRect = null;
         return;
       }
