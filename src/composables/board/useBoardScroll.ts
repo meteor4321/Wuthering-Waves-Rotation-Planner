@@ -19,6 +19,44 @@ interface ScrollOptions {
    * （區塊巡覽用：不在畫面內才跟隨）；預設 false = 一律置中（貼上定位用）。
    */
   onlyIfNeeded?: boolean;
+  /** 置中基準：'track'（預設）＝可視軌道區中心；'viewport'＝整個視窗的水平中心
+   *  （熱鍵模式幽靈格用——捲動容器在側欄右側，軌道區中心相對視窗偏右，
+   *   以視窗為基準才符合「幽靈格釘在螢幕正中央」的直覺）。 */
+  centerOn?: 'track' | 'viewport';
+}
+
+/**
+ * 計算「讓 el 水平置中」的目標 scrollLeft（已 clamp 到可捲範圍）。
+ * centerOn='track'：置中於可視軌道區（捲動容器寬扣掉左側 sticky header）。
+ * centerOn='viewport'：置中於整個視窗——捲動容器位在側欄右側，須把側欄
+ *   （含收合殘寬）與 header 都納入偏移；若視窗中心落在 sticky header 底下
+ *   （極端窄窗），退到 header 右緣以免目標被蓋住。
+ * 供本檔平滑捲動與熱鍵模式輸送帶捲動（useGhostConveyor）共用同一套置中數學。
+ */
+export function computeCenterScrollLeft(
+  el: HTMLElement,
+  scroll: HTMLElement,
+  centerOn: 'track' | 'viewport' = 'track',
+): number {
+  const scrollRect = scroll.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const headerW =
+    scroll.querySelector<HTMLElement>('.swimlane__header')?.getBoundingClientRect().width ?? 0;
+  // 元素中心在「捲動內容座標系」的位置
+  const elCenterInContent =
+    scroll.scrollLeft + (elRect.left - scrollRect.left) + elRect.width / 2;
+  // 置中基準點（相對捲動容器左緣）
+  const visibleCenter =
+    centerOn === 'viewport'
+      ? Math.max(
+          // 視窗水平中心（clientWidth 不含垂直捲軸，較 innerWidth 準）換算為容器內座標
+          document.documentElement.clientWidth / 2 - scrollRect.left,
+          // 保底：不讓目標中心落到 sticky header 底下（目標左緣至少貼齊 header 右緣）
+          headerW + elRect.width / 2,
+        )
+      : headerW + (scrollRect.width - headerW) / 2;
+  const maxScrollLeft = scroll.scrollWidth - scroll.clientWidth;
+  return Math.max(0, Math.min(elCenterInContent - visibleCenter, maxScrollLeft));
 }
 
 export function useBoardScroll() {
@@ -53,15 +91,10 @@ export function useBoardScroll() {
         if (elRect.left >= trackLeft && elRect.right <= trackRight) return;
       }
 
-      // 區塊中心在「捲動內容座標系」的位置
-      const elCenterInContent =
-        scroll.scrollLeft + (elRect.left - scrollRect.left) + elRect.width / 2;
-      // 可視軌道區（header 右側）的中心
-      const visibleCenter = headerW + (scrollRect.width - headerW) / 2;
-
-      const maxScrollLeft = scroll.scrollWidth - scroll.clientWidth;
-      const target = Math.max(0, Math.min(elCenterInContent - visibleCenter, maxScrollLeft));
-      scroll.scrollTo({ left: target, behavior: 'smooth' });
+      scroll.scrollTo({
+        left: computeCenterScrollLeft(el, scroll, options.centerOn ?? 'track'),
+        behavior: 'smooth',
+      });
     });
   }
 

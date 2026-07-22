@@ -17,7 +17,7 @@ import { computed, onMounted, nextTick, ref, watch } from 'vue'
 import Swimlane from '@/components/rotation/Swimlane.vue'
 import HotkeyModeOverlay from '@/components/rotation/HotkeyModeOverlay.vue'
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode'
-import { useGhostCellFlip } from '@/composables/board/useGhostCellFlip'
+import { useGhostConveyor } from '@/composables/board/useGhostConveyor'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useRotationStore } from '@/stores/useRotationStore'
@@ -47,8 +47,8 @@ const history = useHistory()
 
 // 熱鍵輸入模式：面板右上角進入鈕 ＋ active 時掛 overlay（控制列/滾輪切泳道）。
 const hotkeyMode = useHotkeyInputMode()
-// 幽靈格 FLIP 平滑移動：落子右移／切泳道垂直移動時從舊位置滑過去（不再瞬移）。
-useGhostCellFlip()
+// 幽靈格輸送帶動態：幽靈格釘在可視區水平中央，落子／刪除時底下的軸平滑捲動。
+useGhostConveyor()
 
 // ── 泳道顯示順序 ─────────────────────────────────────────────
 // 依 laneOrder 把 slots 重新排成「上下顯示順序」。slots 以 slotIndex 為索引，
@@ -316,9 +316,13 @@ watch(previewGridTemplate, () => {
   content.style.minWidth = `${prev.scrollLeft + prev.clientWidth}px`
 
   // 步驟二：量測「自然」內容寬（此次強制排版帶著撐寬，offset 合法、不會夾回）。
-  // 泳道群為 flex 子項（不被父層 min-width 拉伸），gBCR 即自然寬；尾端留白恆 50cqw。
+  // 泳道群為 flex 子項（不被父層 min-width 拉伸），gBCR 即自然寬；尾端留白
+  // 直接實測（寬度由 --board-end-spacer 決定，勿在此重複硬編碼）。
   const lanesW = content.querySelector('.board__lanes')?.getBoundingClientRect().width ?? 0
-  const naturalMax = Math.max(0, lanesW + prev.clientWidth * 0.5 - scroll.clientWidth)
+  const spacerW =
+    content.querySelector('.board__end-spacer')?.getBoundingClientRect().width
+      ?? prev.clientWidth * 0.5
+  const naturalMax = Math.max(0, lanesW + spacerW - scroll.clientWidth)
 
   if (scroll.scrollLeft > naturalMax) {
     // 步驟三：程式化捲動到新的最右端（正常捲動路徑，sticky 與偏移同幀一致）。
@@ -572,6 +576,11 @@ onMounted(() => {
   /* 宣告為容器查詢容器：讓尾端留白與泳道最小寬能以 cqw（可視寬度）定尺寸，
      捲動內容再寬，cqw 仍以「可視視窗寬」為基準（scrollWidth 不影響）。 */
   container-type: inline-size;
+  /* 尾端留白寬（單一事實來源：留白佔位與泳道焦點環 right 共用）。
+     50cqw＝可視寬一半；+44px＝收合側欄細軌寬（AppLayout COLLAPSED_RAIL_WIDTH）——
+     熱鍵模式幽靈格以「整個視窗」為置中基準，視窗中心比軌道區中心偏左約
+     半個細軌寬，須多留這些捲動空間才不會被 maxScrollLeft 夾住而偏右。 */
+  --board-end-spacer: calc(50cqw + 44px);
 }
 
 /* 橫向內容列：泳道群（撐滿可視寬、可再被內容撐寬）＋ 尾端留白佔位。 */
@@ -585,12 +594,12 @@ onMounted(() => {
 
 /* ── 泳道選取焦點環（W/S 巡覽）────────────────────────────────
    視覺沿用原 .swimlane--lane-selected（青色邊框＋淡底＋內輝光），改為單一
-   覆蓋層以便在泳道間平滑滑動。右緣內縮 50cqw＝扣掉尾端留白，恰貼齊泳道
+   覆蓋層以便在泳道間平滑滑動。右緣內縮尾端留白寬（共用變數），恰貼齊泳道
    群右緣；pointer-events 穿透不擋任何互動。 */
 .lane-focus-ring {
   position: absolute;
   left: 0;
-  right: 50cqw;
+  right: var(--board-end-spacer);
   pointer-events: none;
   /* 滑動補間刻意用 top 而非 transform：transform 會使本體形成 stacking
      context，把 ::after 的 z-index 困在內、永遠壓不過 header（z:5）。
@@ -652,7 +661,7 @@ onMounted(() => {
    純佔位、不可互動：掛 data-neutral-zone（拖曳鬆手一律彈回，非落點非刪除區），
    無任何視覺（透明），高度隨 flex stretch 貼齊三泳道帶。 */
 .board__end-spacer {
-  flex: 0 0 50cqw;
+  flex: 0 0 var(--board-end-spacer);
 }
 
 /* 泳道拖曳進行中：整個面板游標呈抓取態 */

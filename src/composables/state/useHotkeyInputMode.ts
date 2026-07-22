@@ -101,9 +101,10 @@ export function useHotkeyInputMode() {
     rotationStore.selectLane(lane);
   }
 
-  /** 把插入落點（幽靈格）水平置中於可視軌道區。 */
+  /** 把插入落點（幽靈格）水平置中——以「整個視窗」為基準（非軌道區中心，
+   *  軌道區在側欄右側、其中心相對螢幕偏右），與輸送帶捲動的釘點一致。 */
   function centerGhostCell(): void {
-    scrollSelectorIntoView('.track__ghost-cell');
+    scrollSelectorIntoView('.track__ghost-cell', { centerOn: 'viewport' });
   }
 
   /** 進入模式：預設選中畫面上第一條有選角的泳道；全空則不進入。 */
@@ -182,9 +183,9 @@ export function useHotkeyInputMode() {
       rotationStore.entries.length - 1,
     );
     // 標記剛插入的區塊 → RotationBlock 播一次落下吸附進場動畫（一次性，播畢即清）。
+    // 落點跟隨改由 useGhostConveyor 監聽 entries 數觸發（輸送帶捲動＋幽靈格釘中央），
+    // 此處不再呼叫 centerGhostCell（兩套捲動會互搶）。
     _markEntering(newId);
-    // 自動跟隨：每次插入後把「下一個落點」（幽靈格）置中於可視軌道區。
-    centerGhostCell();
   }
 
   /**
@@ -215,8 +216,7 @@ export function useHotkeyInputMode() {
   /** 把一次 tap 排入合併緩衝並重新計時；幽靈格同步預顯累積文字（寬度隨之變化）。 */
   function bufferTap(label: string): void {
     _tapBufferLabels.value = [..._tapBufferLabels.value, label];
-    _restartTapCombineTimer();
-    centerGhostCell(); // 預顯文字變長 → 幽靈格變寬，保持落點在視野內
+    _restartTapCombineTimer(); // 幽靈格變寬的跟隨由 useGhostConveyor 監聽預顯文字觸發
   }
 
   /**
@@ -340,8 +340,7 @@ export function useHotkeyInputMode() {
       // 先克隆再即刪：版面立即收合（下一塊馬上成為新末塊，連按不卡），
       // 淡出由固定在原螢幕位置的克隆呈現，與版面脫鉤。
       _playDeleteGhost(last.id);
-      rotationStore.deleteBlock(last.id);
-      centerGhostCell(); // 欄位收合後落點重新置中
+      rotationStore.deleteBlock(last.id); // 落點跟隨由 useGhostConveyor 監聽 entries 數觸發
     }
   }
 
@@ -364,8 +363,7 @@ export function useHotkeyInputMode() {
         flushTapBuffer(); // 待合併內容先結算成一步，undo 語意才乾淨
         if (k === 'y' || event.shiftKey) history.redo();
         else history.undo();
-        ensureLaneSelected(laneBefore);
-        if (active.value) centerGhostCell(); // undo 可能大幅增刪區塊 → 落點重新置中
+        ensureLaneSelected(laneBefore); // 落點跟隨由 useGhostConveyor 監聽 entries 數觸發
       }
       return; // 其餘 Ctrl 組合：模式中一律不動作
     }
