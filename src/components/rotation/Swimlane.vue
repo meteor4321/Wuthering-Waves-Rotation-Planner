@@ -885,6 +885,24 @@ async function handleDeselectCharacter(): Promise<void> {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 環淡出的同時文字淡入登場，接棒承接視覺焦點（時長與環淡出對齊）。 */
+  animation: ghost-hold-label-in 220ms ease both;
+}
+@keyframes ghost-hold-label-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .track__ghost-cell--hold .track__ghost-ring {
+    transition: none;
+  }
+  .track__ghost-hold-label {
+    animation: none;
+  }
 }
 /* 達閾值時底色略提亮，強化「已進入長按區」的狀態感。 */
 .track__ghost-cell--hold {
@@ -927,6 +945,14 @@ async function handleDeselectCharacter(): Promise<void> {
 }
 .track__ghost-cell--pressing .track__ghost-ring-fill {
   animation: ghost-ring-fill 300ms linear forwards;
+}
+
+/* 環填滿（達閾值 → 進入 --hold，時點與 300ms 填滿動畫收尾對齊）後柔和淡出，
+   只留下中心的預顯文字：環已完成「倒數到落子點」的任務，繼續留著會與文字爭焦點。
+   同一/更高特異度且置於 --pressing 規則之後 → 覆蓋其 opacity:1。 */
+.track__ghost-cell--hold .track__ghost-ring {
+  opacity: 0;
+  transition: opacity 220ms ease;
 }
 
 @keyframes ghost-ring-fill {
