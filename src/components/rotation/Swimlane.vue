@@ -79,13 +79,15 @@ const hotkeyMode = useHotkeyInputMode()
 const showGhostCell = computed<boolean>(
   () => hotkeyMode.active.value && rotationStore.selectedLaneIndex === props.slotIndex,
 )
-// 幽靈格右側外置預顯文字（R3）：長按預顯優先，其次連點合併累積文字，
-// 最後是單擊即時預顯（按住 tap 鍵期間；關閉快速連點合併時的唯一預顯來源）。
+// 幽靈格右側外置預顯文字（R3）：連點合併累積文字優先，其次長按預顯，最後單擊即時預顯。
+// 合併緩衝擺第一：緩衝非空時按壓中一律顯示「已提交的緩衝」，放開才把這一按（tap／hold）
+// 串上去 → tap 與 hold 觀感一致（避免長按達閾值時 hold 預顯蓋掉已累積的緩衝而畫面跳動）。
+// 緩衝為空時，長按預顯仍會顯示單塊 hold label（tapCombineLabel 為 null 自然落到它）。
 // 外置（絕對定位、不佔 grid 欄寬）讓幽靈格保持固定正方 → 置中釘點不受文字長度影響。
 const ghostPreviewText = computed<string | null>(
   () =>
-    hotkeyMode.holdPreviewLabel.value ??
     hotkeyMode.tapCombineLabel.value ??
+    hotkeyMode.holdPreviewLabel.value ??
     hotkeyMode.tapPreviewLabel.value,
 )
 
