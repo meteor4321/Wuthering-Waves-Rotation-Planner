@@ -88,11 +88,6 @@ export const RESERVED_CODES: ReadonlySet<string> = new Set([
   'NumLock',
 ]);
 
-/** 判斷 hotkey 是否為滑鼠鍵。 */
-export function isMouseHotkey(hotkey: string): boolean {
-  return hotkey === MOUSE_LEFT || hotkey === MOUSE_RIGHT;
-}
-
 /** formatHotkey 用的翻譯函式型別（僅取 vue-i18n `t` 的最小簽章，避免相依整包 i18n）。 */
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 

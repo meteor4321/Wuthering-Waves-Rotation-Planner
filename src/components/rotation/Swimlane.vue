@@ -469,7 +469,6 @@ async function handleDeselectCharacter(): Promise<void> {
               :is-editing="rotationStore.editingId === entry.id"
               :is-label-highlighted="isLabelHighlighted(entry)"
               :is-editing-dimmed="isEditingDimmed(entry)"
-              :is-leaving="rotationStore.isLeaving(entry.id)"
               :is-entering="hotkeyMode.enteringId.value === entry.id"
               :style="blockStyle(entry.id)"
               role="listitem"

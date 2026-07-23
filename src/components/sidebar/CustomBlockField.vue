@@ -4,7 +4,7 @@
 // 支援：拖到主軸、＋新增後即命名、雙擊重命名、點擊選取（Ctrl 多選）、
 //       刪除鈕 / Delete 鍵刪除、多選整組拖曳（命名/新增比照 GeneralBlockField）。
 // 不靠父層傳資料，自己讀角色與模板兩個 store，是個獨立運作的面板。
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import BlockChip from '@/components/ui/BlockChip.vue'
 import DragCountBadge from '@/components/ui/DragCountBadge.vue'
@@ -12,6 +12,8 @@ import { useTemplateStore } from '@/stores/useTemplateStore'
 import { useCharacterStore } from '@/stores/useCharacterStore'
 import { useLaneOrder } from '@/composables/state/useLaneOrder'
 import { useSidebarDragList } from '@/composables/blockDrag/useSidebarDragList'
+import { useChipInlineEdit } from '@/composables/sidebar/useChipInlineEdit'
+import { useSidebarDeleteKey } from '@/composables/sidebar/useSidebarDeleteKey'
 import { getElementColor } from '@/constants/elements'
 import { characterDisplayName } from '@/i18n'
 import type { TemplateBlock } from '@/types/block'
@@ -67,64 +69,25 @@ function handleDelete(templateId: string): void {
   templateStore.deleteTemplate(templateId)
 }
 
-// ── 行內命名 / 重命名（比照 GeneralBlockField） ─────────────────
+// ── 行內命名 / 重命名（共用 useChipInlineEdit）─────────────────
 const rootRef = ref<HTMLElement | null>(null)
-const editingId = ref<string | null>(null)
-const draft = ref('')
-// 輸入框寬度隨草稿即時撐開；全形（CJK）約佔 2ch，逐字估寬並補 letter-spacing。
-const WIDE_CHAR_RE =
-  /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/
-const editStyle = computed(() => {
-  let ch = 0
-  for (const c of draft.value) ch += WIDE_CHAR_RE.test(c) ? 2 : 1
-  const spacing = (draft.value.length * 0.03).toFixed(2)
-  return { width: `calc(${Math.max(ch, 1)}ch + ${spacing}em + 1.4rem)` }
-})
-// 進入編輯後聚焦輸入框並全選（DOM 更新後執行）。
-watch(editingId, (id) => {
-  if (!id) return
-  void nextTick(() => {
-    const el = rootRef.value?.querySelector<HTMLInputElement>('.chip-edit')
-    el?.focus()
-    el?.select()
+const { editingId, draft, editStyle, startEdit, commitEdit, onEditKeydown } =
+  useChipInlineEdit({
+    rootRef,
+    // 空字串＝刪除、同角色重名＝不寫入（皆由 store 內處理）
+    commit: (id, label) => templateStore.updateTemplateLabel(id, label),
+    // 剛新增卻未命名（label 仍為空）→ 順手刪除避免殘留空塊。
+    onCancel: (id) => {
+      const tpl = templateStore.templates.find((x) => x.id === id)
+      if (tpl && tpl.label.trim() === '') templateStore.deleteTemplate(id)
+    },
   })
-})
-
-function startEdit(template: TemplateBlock): void {
-  editingId.value = template.id
-  draft.value = template.label
-}
-
-let finishing = false
-function commitEdit(): void {
-  if (finishing || editingId.value === null) return
-  finishing = true
-  // 空字串＝刪除、同角色重名＝不寫入（皆由 store 內處理）
-  templateStore.updateTemplateLabel(editingId.value, draft.value)
-  editingId.value = null
-  finishing = false
-}
-function cancelEdit(): void {
-  if (finishing || editingId.value === null) return
-  finishing = true
-  const id = editingId.value
-  editingId.value = null
-  finishing = false
-  // 剛新增卻未命名（label 仍為空）→ 順手刪除避免殘留空塊。
-  const tpl = templateStore.templates.find((x) => x.id === id)
-  if (tpl && tpl.label.trim() === '') templateStore.deleteTemplate(id)
-}
-function onEditKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter') { event.preventDefault(); commitEdit() }
-  else if (event.key === 'Escape') { event.preventDefault(); cancelEdit() }
-}
 
 // ＋ 新增：建一個空 label 模板（色用角色屬性色），立即進入命名。
 function addAndEdit(character: Character | null): void {
   if (!character) return
   const id = templateStore.addTemplate(character.id, getElementColor(character.element))
-  editingId.value = id
-  draft.value = ''
+  startEdit(id, '')
 }
 
 // 點擊模板：Ctrl/Cmd 多選切換；純點擊單選/再點同一個則取消。
@@ -136,27 +99,11 @@ function handleTemplateClick(templateId: string, event: MouseEvent): void {
   templateStore.toggleTemplateSelection(templateId, additive)
 }
 
-// 以 capture 階段攔截 Delete/Backspace：當模板庫有選取時優先刪模板，
-// 並 stopPropagation 阻止 window 上的全域快捷鍵（會誤刪主軸選取區塊）。
-function onKeydownCapture(event: KeyboardEvent): void {
-  if (event.key !== 'Delete' && event.key !== 'Backspace') return
-  if (templateStore.selectedTemplateIds.size === 0) return
-  const target = event.target as HTMLElement
-  const tag = target?.tagName?.toLowerCase()
-  if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
-  event.preventDefault()
-  event.stopPropagation()
-  templateStore.deleteSelectedTemplates()
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', onKeydownCapture, true)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydownCapture, true)
-  // 元件卸除（切換頁籤離開自訂模板）時清掉殘留選取
-  templateStore.clearTemplateSelection()
+// Delete/Backspace 批量刪除（capture 攔截、卸載清選取）：共用 useSidebarDeleteKey。
+useSidebarDeleteKey({
+  hasSelection: () => templateStore.selectedTemplateIds.size > 0,
+  deleteSelected: () => templateStore.deleteSelectedTemplates(),
+  clearSelection: () => templateStore.clearTemplateSelection(),
 })
 </script>
 
@@ -206,7 +153,7 @@ onUnmounted(() => {
             :key="template.id"
             class="chip-wrapper"
             @click.stop="handleTemplateClick(template.id, $event)"
-            @dblclick.stop="startEdit(template)"
+            @dblclick.stop="startEdit(template.id, template.label)"
           >
             <!-- 命名 / 重命名：以輸入框取代 chip（比照 GeneralBlockField）。 -->
             <input
@@ -370,96 +317,7 @@ onUnmounted(() => {
   display: inline-flex;
 }
 
-/* ── 行內命名輸入框：外觀對齊 compact BlockChip（比照 GeneralBlockField）。 ── */
-.chip-edit {
-  box-sizing: border-box;
-  /* 寬度完全由 :style 隨草稿即時撐開（最小＝1 字寬＋內距） */
-  height: 2.75rem;               /* 44px，與 compact chip 同高 */
-  padding: 0 0.5rem;
-  border: 1.5px solid rgba(125, 211, 252, 0.85);
-  border-radius: 3px;
-  background-color: #1e293b;
-  color: #ffffff;
-  font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace),
-    'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
-  font-size: 0.9375rem;          /* 15px，與 compact chip label 一致 */
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 0.03em;
-  caret-color: #22d3ee;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
-}
-
-/* ── ＋ 新增鈕：虛線方框（比照 GeneralBlockField）。 ── */
-.add-block-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 2.75rem;               /* 與 compact chip 同高 */
-  border-radius: 3px;
-  border: 1px dashed rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-}
-.add-block-btn:hover,
-.add-block-btn:focus-visible {
-  border-color: rgba(34, 211, 238, 0.6);
-  color: rgba(34, 211, 238, 0.95);
-  background: rgba(34, 211, 238, 0.08);
-  outline: none;
-}
-
-/* 刪除按鈕 */
-.delete-btn {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  z-index: 10;
-  width: 1.125rem;
-  height: 1.125rem;
-  padding: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  pointer-events: none;
-  background: rgba(30, 30, 35, 0.92);
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  color: rgba(239, 68, 68, 0.80);
-  cursor: pointer;
-}
-
-.chip-wrapper:hover .delete-btn,
-.chip-wrapper:focus-within .delete-btn {
-  opacity: 1;
-  transform: scale(1);
-  pointer-events: auto;
-}
-
-.delete-btn:hover {
-  background: rgba(239, 68, 68, 0.20);
-  border-color: rgba(239, 68, 68, 0.70);
-  color: #ef4444;
-}
-
-.delete-btn:active {
-  transform: scale(0.92);
-}
-
-.delete-icon {
-  width: 0.5rem;
-  height: 0.5rem;
-}
+/* 行內命名輸入框／＋新增鈕／刪除鈕樣式抽至共用 chipFieldShared.css。 */
 
 /* 分組分隔線 */
 .group-divider {
@@ -469,12 +327,11 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .delete-btn {
-    transition: opacity 0.1s ease;
-    transform: scale(1) !important;
-  }
   .group-color-bar {
     transition: none;
   }
 }
 </style>
+
+<!-- 共用樣式：行內命名輸入框、＋新增鈕、刪除鈕（scoped 由本元件自帶）。 -->
+<style scoped src="./chipFieldShared.css"></style>

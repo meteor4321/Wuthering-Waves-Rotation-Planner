@@ -18,7 +18,7 @@ import { deepClone } from '../utils/deepClone';
 import { useHistory } from '@/composables/state/useHistory';
 import { useSettings } from '@/composables/state/useSettings';
 import { t } from '@/i18n';
-import { prefersReducedMotion } from '../utils/reducedMotion';
+import { playDeleteGhosts } from '../utils/deleteGhost';
 import {
   insertEntryAfterIndex,
   removeEntryById,
@@ -26,9 +26,6 @@ import {
   moveEntry,
   findEntryIndexById,
 } from '../utils/arrayHelpers';
-
-/** 刪除消失動畫時長(ms)，須與 RotationBlock 的 @keyframes block-leave 一致。 */
-const LEAVE_MS = 180;
 
 export const useRotationStore = defineStore('rotation', () => {
   // ── State ──────────────────────────────────
@@ -72,9 +69,6 @@ export const useRotationStore = defineStore('rotation', () => {
   // 進入編輯瞬間草稿＝主要區塊的原字，若立即鏡射/提交會把其他成員的字
   // 誤蓋成主要區塊的字；必須等使用者真的打字（setEditingDraft）才生效。
   const editingDraftDirty = ref(false);
-
-  /** 正在播刪除消失動畫的 id 集合；仍留在 entries 佔欄位，動畫結束才真正移除。 */
-  const leavingIds = ref<Set<string>>(new Set());
 
   const history = useHistory();
 
@@ -277,33 +271,19 @@ export const useRotationStore = defineStore('rotation', () => {
     editingDraftDirty.value = false;
   }
 
-  /** 播放消失動畫後移除一組區塊（reduce 則即刪）；不含 history/選取處理，供各刪除入口共用。 */
-  function animateThenRemove(idsToDelete: string[]): void {
-    if (idsToDelete.length === 0) return;
-    if (prefersReducedMotion()) {
-      entries.value = removeEntriesByIds(entries.value, idsToDelete);
-      return;
-    }
-    idsToDelete.forEach((id) => leavingIds.value.add(id));
-    setTimeout(() => {
-      entries.value = removeEntriesByIds(entries.value, idsToDelete);
-      idsToDelete.forEach((id) => leavingIds.value.delete(id));
-    }, LEAVE_MS);
-  }
-
-  /** 批量刪除選中區塊：先標記 leavingIds 播動畫，LEAVE_MS 後移除（reduce 則即刪）。 */
+  /** 批量刪除選中區塊：狀態「即刪」（版面立即收合、undo/切軸無時間差空窗），
+   *  消失淡出交給脫離版面的克隆補播（playDeleteGhosts，與熱鍵模式刪除同機制）。 */
   function deleteSelectedBlocks(): void {
     const idsToDelete = [...selectedIds.value];
     if (idsToDelete.length === 0) return;
     history.record();
-    // 立即清除選取，讓區塊在消失動畫期間呈現未選取樣式
     selectedIds.value.clear();
-    animateThenRemove(idsToDelete);
+    playDeleteGhosts(idsToDelete); // 須在移除前克隆（此時區塊還在 DOM）
+    entries.value = removeEntriesByIds(entries.value, idsToDelete);
   }
 
   /** 拖曳落入刪除區的落地入口：記錄一次歷史後「即時」整組移除（單顆/多選共用）。
-   *  刻意不走 animateThenRemove：拖曳期間原區塊已隱藏、欄位已自預覽版面排除，
-   *  若延遲移除會讓欄寬先彈開再收合（閃爍）；消失淡出改由浮動分身克隆呈現
+   *  不播 delete-ghost：拖曳期間原區塊已隱藏，消失淡出由浮動分身克隆呈現
    *  （useBlockDrag 的 delete-ghost）。 */
   function deleteBlocks(ids: string[]): void {
     const idsToDelete = ids.filter((id) => entries.value.some((e) => e.id === id));
@@ -311,11 +291,6 @@ export const useRotationStore = defineStore('rotation', () => {
     history.record();
     idsToDelete.forEach((id) => selectedIds.value.delete(id));
     entries.value = removeEntriesByIds(entries.value, idsToDelete);
-  }
-
-  /** isLeaving：該區塊是否正在播放刪除消失動畫。 */
-  function isLeaving(id: string): boolean {
-    return leavingIds.value.has(id);
   }
 
   function selectBlock(id: string, isMultiSelect: boolean = false): void {
@@ -438,7 +413,6 @@ export const useRotationStore = defineStore('rotation', () => {
     deleteBlock,
     deleteSelectedBlocks,
     deleteBlocks,
-    isLeaving,
     selectBlock,
     selectBlocks,
     selectLane,
