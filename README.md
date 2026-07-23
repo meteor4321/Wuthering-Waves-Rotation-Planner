@@ -38,7 +38,13 @@
 
 **[wuthering-waves-rotation-planner.vercel.app](https://wuthering-waves-rotation-planner.vercel.app/)**
 
+### Feature Overview
+
 https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
+
+### Hotkey Input Mode
+
+
 
 ## Highlights
 * Fully visual, drag-based editing
@@ -59,7 +65,7 @@ https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
 - **Drag & drop**: blocks move freely, and following blocks automatically align and fill the gap
 - **Block editing**: add, delete, copy, paste, cut, and edit text inline
 - **Multi-select**: Ctrl+click, marquee selection, or select an entire character track
-- **Hotkey input mode**: map custom keys to blocks and insert them rapidly at the end of a character track like a rhythm game — supports tap/hold and mouse buttons
+- **Hotkey input mode**: customize hotkeys and their mapped blocks to insert them rapidly via hotkeys; supports tap/hold and mouse input
 - **Undo/redo**: a snapshot of every action is stored in the history
 
 ### Persistence

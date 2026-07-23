@@ -38,7 +38,13 @@
 
 **[wuthering-waves-rotation-planner.vercel.app](https://wuthering-waves-rotation-planner.vercel.app/)**
 
+### 全局功能一览
+
 https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
+
+### 热键输入模式
+
+
 
 ## 特色
 * 纯可视化操作
@@ -59,7 +65,7 @@ https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
 - **拖拽式操作**：区块可自由拖拽,且后方区块会自动对齐、补位
 - **区块编辑**：新增、删除、复制、粘贴、剪切、行内编辑文字
 - **多重选取**：Ctrl+点选、鼠标框选、整条角色轴选取
-- **热键输入模式**：自定义按键对映区块,如节奏游戏般连续按键即可在角色轴末端快速插入,支持点按/长按与鼠标键
+- **热键输入模式**：绑定热键与对映的区块,透过热键快速插入；支持点按／长按与鼠标输入
 - **撤销/重做**：每一步操作的快照会存入历史记录中
 
 ### 数据持久化
