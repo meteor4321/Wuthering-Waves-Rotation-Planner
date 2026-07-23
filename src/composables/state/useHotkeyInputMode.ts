@@ -56,6 +56,16 @@ const _pressingHotkey = ref<string | null>(null);
 // 長按即時預顯（§3.3）：按住超過閾值且該鍵有 hold 條目時，填入其 label，
 // 讓使用者在放開前就知道會落哪一塊。為 null＝未達閾值或該鍵無 hold 條目。
 const _holdPreviewLabel = ref<string | null>(null);
+// 單擊即時預顯：起按瞬間顯示該鍵 tap 條目的 label（放開落子前就知道會落哪一塊）。
+// 與合併緩衝預顯互補：關閉快速連點合併時落子不經緩衝，這是唯一的預顯來源。
+// 達長按閾值即清（tap 窗已過：有 hold 條目換 hold 預顯；tap-only 鍵長按＝取消，無可預顯）。
+const _tapPreviewLabel = ref<string | null>(null);
+// 單擊落子後預顯續留時間：與合併緩衝窗同值，讓「關閉快速連點合併」時的淡入淡出
+// 與「合併」路徑一致——快速一擊的按壓極短（數十毫秒），若隨放開即清，120ms 淡入
+// 來不及完成就轉淡出，只會閃一下；續留此毫秒數再淡出，預顯才會完整呈現。
+const TAP_PREVIEW_LINGER_MS = TAP_COMBINE_WINDOW_MS;
+// 單擊落子後續留計時器 id（到期清 _tapPreviewLabel；新按壓／暫停／退出時提前清）。
+let _tapPreviewLingerTimer: number | null = null;
 // 達閾值計時器 id（跨鍵盤／滑鼠共用單一計時器；起按設、放開／暫停／退出清）。
 let _holdTimer: number | null = null;
 // 刪除訊號（遞增計數）：每次熱鍵刪除 +1，驅動垂直焦點框直柱閃紅一次
@@ -266,6 +276,10 @@ export function useHotkeyInputMode() {
       // 新一輪按壓起始：驅動幽靈格徑向進度環從 0 開始填（作業系統自動重複不覆蓋）。
       _pressingHotkey.value = hotkey;
       _scheduleHoldPreview(hotkey);
+      // 單擊即時預顯：起按就顯示 tap 條目 label（hold-only 鍵與 Digit 入場技解析為 null 不顯示）。
+      // 須在 _scheduleHoldPreview 之後設（其開頭的 _clearHoldPreview 會連同本值一起清）。
+      const tapEntry = hotkeyMap.resolveByCodeAndPress(hotkey, 'tap');
+      _tapPreviewLabel.value = tapEntry ? tapEntry.label : null;
     }
     return true;
   }
@@ -276,8 +290,9 @@ export function useHotkeyInputMode() {
     _holdTimer = window.setTimeout(() => {
       _holdTimer = null;
       if (_pressingHotkey.value !== hotkey) return; // 已放開／換鍵
-      // 僅在「真的有 hold 條目」時預顯：resolveByCodeAndPress('hold') 會對只有 tap 的鍵
-      // 退回 tap（§3.3 寬容），那種情況放開仍落 tap、無別的東西可預顯，故排除。
+      // 達閾值＝tap 窗已過：清掉單擊預顯（tap-only 鍵長按＝取消輸入，放開不落子）。
+      _tapPreviewLabel.value = null;
+      // 僅在「真的有 hold 條目」時預顯（resolveByCodeAndPress('hold') 對 tap-only 鍵回 null）。
       const entry = hotkeyMap.resolveByCodeAndPress(hotkey, 'hold');
       if (entry && entry.pressType === 'hold' && entry.label.trim() !== '') {
         _holdPreviewLabel.value = entry.label;
@@ -285,13 +300,32 @@ export function useHotkeyInputMode() {
     }, HOLD_THRESHOLD_MS);
   }
 
-  /** 清掉長按預顯（計時器＋已顯示的 label）。放開／暫停／退出／換鍵時呼叫。 */
+  /** 清掉按壓預顯（長按計時器＋長按/單擊 label）。放開／暫停／退出／換鍵時呼叫。 */
   function _clearHoldPreview(): void {
     if (_holdTimer !== null) {
       clearTimeout(_holdTimer);
       _holdTimer = null;
     }
     _holdPreviewLabel.value = null;
+    _tapPreviewLabel.value = null;
+    if (_tapPreviewLingerTimer !== null) {
+      clearTimeout(_tapPreviewLingerTimer);
+      _tapPreviewLingerTimer = null;
+    }
+  }
+
+  /**
+   * 單擊落子後讓預顯續留一小段再淡出（關閉快速連點合併時使用）。
+   * 與 endPress 同一同步流程中，_clearHoldPreview 先把 label 清為 null、本函式隨即
+   * 再設回——同 tick 淨值不變，故不觸發離場，預顯自按壓起連續呈現至此續留結束才淡出。
+   */
+  function _lingerTapPreview(label: string): void {
+    if (_tapPreviewLingerTimer !== null) clearTimeout(_tapPreviewLingerTimer);
+    _tapPreviewLabel.value = label;
+    _tapPreviewLingerTimer = window.setTimeout(() => {
+      _tapPreviewLingerTimer = null;
+      _tapPreviewLabel.value = null;
+    }, TAP_PREVIEW_LINGER_MS);
   }
 
   /**
@@ -318,6 +352,9 @@ export function useHotkeyInputMode() {
       // 長按落子不參與合併：先結算緩衝，再單獨插入。
       flushTapBuffer();
       insertLabel(entry.label);
+      // 關閉快速連點合併時的單擊：落子後讓預顯續留再淡出，淡入淡出與合併路徑一致
+      //（長按落子不續留：hold 預顯已於按住期間完整呈現，放開自全不透明淡出）。
+      if (pressType === 'tap') _lingerTapPreview(entry.label);
     }
     return true;
   }
@@ -444,6 +481,8 @@ export function useHotkeyInputMode() {
   );
   // 長按即時預顯的 label（達閾值且有 hold 條目才非空）。驅動 Swimlane 幽靈格文字。
   const holdPreviewLabel = computed<string | null>(() => _holdPreviewLabel.value);
+  // 單擊即時預顯的 label（按住 tap 鍵、未達長按閾值期間非空）。驅動 Swimlane 幽靈格文字。
+  const tapPreviewLabel = computed<string | null>(() => _tapPreviewLabel.value);
   // 連點合併預顯：緩衝中累積的串接文字（無待合併內容為 null）。
   // 驅動 Swimlane 幽靈格顯示「即將合併落下的一塊」，寬度隨文字長度變化。
   const tapCombineLabel = computed<string | null>(() =>
@@ -458,6 +497,7 @@ export function useHotkeyInputMode() {
     controlsReady,
     pressing,
     holdPreviewLabel,
+    tapPreviewLabel,
     tapCombineLabel,
     enteringId,
     deleteFlashTick: _deleteFlashTick,

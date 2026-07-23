@@ -79,10 +79,14 @@ const hotkeyMode = useHotkeyInputMode()
 const showGhostCell = computed<boolean>(
   () => hotkeyMode.active.value && rotationStore.selectedLaneIndex === props.slotIndex,
 )
-// 幽靈格右側外置預顯文字（R3）：長按預顯優先，其次連點合併累積文字。
+// 幽靈格右側外置預顯文字（R3）：長按預顯優先，其次連點合併累積文字，
+// 最後是單擊即時預顯（按住 tap 鍵期間；關閉快速連點合併時的唯一預顯來源）。
 // 外置（絕對定位、不佔 grid 欄寬）讓幽靈格保持固定正方 → 置中釘點不受文字長度影響。
 const ghostPreviewText = computed<string | null>(
-  () => hotkeyMode.holdPreviewLabel.value ?? hotkeyMode.tapCombineLabel.value,
+  () =>
+    hotkeyMode.holdPreviewLabel.value ??
+    hotkeyMode.tapCombineLabel.value ??
+    hotkeyMode.tapPreviewLabel.value,
 )
 
 // 本泳道統一顏色＝角色屬性色（同屬性 header 色條/區塊顏色完全一致）。未選角給中性色。
