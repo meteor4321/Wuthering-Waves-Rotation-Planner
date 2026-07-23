@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/9552c0a0-a7aa-43bf-8474-0b78d339fdd7
 
 ### ホットキー入力モード
 
-
+https://github.com/user-attachments/assets/bbc55605-ce35-4f11-9fdd-f8f708967fae
 
 ## 特徴
 * 完全ビジュアルな操作
