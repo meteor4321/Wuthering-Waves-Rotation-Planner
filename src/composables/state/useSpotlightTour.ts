@@ -114,19 +114,62 @@ function refocus(selector: string): void {
   queueMicrotask(() => { suppressCancel = false; });
 }
 
-/** 導覽開始前的版面快照（結束時還原）。 */
-interface BoardSnapshot {
-  slots: CharacterSlots;
-  axes: RotationAxis[];
-  activeAxisId: string;
-  laneOrder: SlotIndex[];
-  templates: TemplateBlock[];
-  history: ReturnType<ReturnType<typeof useHistory>['snapshotStacks']>;
-  // 熱鍵導覽變體：使用者的對映表快照（示範期間暫換預設種子，結束還原）。
-  hotkeyEntries: HotkeyMapEntry[] | null;
-  introEntries: IntroHotkeyEntry[] | null;
+/**
+ * 可還原切片：導覽期間會被示範資料覆蓋、結束須原樣還原的一份狀態。
+ *   - capture()：擷取當前值（一律深拷貝，reactive-safe）。
+ *   - restore(v)：把 capture 的值指派回原處。
+ * 設計目的（Phase 2）：以「登記表」取代手工列舉的快照結構——新增任何持久化
+ * 狀態時，只要在 buildRestorableSlices 註冊一個切片，就同時被快照與還原涵蓋，
+ * 不會再發生「加了新欄位卻忘了還原」的漏接。name 供除錯與未來漂移斷言用。
+ */
+interface RestorableSlice {
+  name: string;
+  capture: () => unknown;
+  restore: (value: unknown) => void;
 }
-let snapshot: BoardSnapshot | null = null;
+
+/**
+ * 建立導覽需快照/還原的所有狀態切片（每次呼叫即時綁定當前 store 實例）。
+ * 一律「全部快照、全部還原」，不依 variant 分歧：還原成相同值是無害的 no-op，
+ * 但少了條件分支就少了漏接的可能——這正是系統化邊界的重點。
+ */
+function buildRestorableSlices(): RestorableSlice[] {
+  const rotationStore = useRotationStore();
+  const characterStore = useCharacterStore();
+  const templateStore = useTemplateStore();
+  const { laneOrder } = useLaneOrder();
+  const history = useHistory();
+  const hotkeyMap = useHotkeyMap();
+  return [
+    { name: 'characterSlots',
+      capture: () => deepClone(characterStore.slots),
+      restore: (v) => { characterStore.slots = deepClone(v as CharacterSlots); } },
+    { name: 'axes',
+      capture: () => deepClone(rotationStore.axes),
+      restore: (v) => { rotationStore.axes = deepClone(v as RotationAxis[]); } },
+    { name: 'activeAxisId',
+      capture: () => rotationStore.activeAxisId,
+      restore: (v) => { rotationStore.activeAxisId = v as string; } },
+    { name: 'laneOrder',
+      capture: () => deepClone(laneOrder.value),
+      restore: (v) => { laneOrder.value = deepClone(v as SlotIndex[]); } },
+    { name: 'templates',
+      capture: () => deepClone(templateStore.templates),
+      restore: (v) => { templateStore.templates = deepClone(v as TemplateBlock[]); } },
+    { name: 'history',
+      capture: () => history.snapshotStacks(),
+      restore: (v) => history.restoreStacks(v as ReturnType<typeof history.snapshotStacks>) },
+    { name: 'hotkeyEntries',
+      capture: () => deepClone(hotkeyMap.entries.value),
+      restore: (v) => { hotkeyMap.entries.value = deepClone(v as HotkeyMapEntry[]); } },
+    { name: 'introEntries',
+      capture: () => deepClone(hotkeyMap.introEntries.value),
+      restore: (v) => { hotkeyMap.introEntries.value = deepClone(v as IntroHotkeyEntry[]); } },
+  ];
+}
+
+/** 導覽開始前的版面快照（切片名 → capture 值；結束時還原）。 */
+let snapshot: Record<string, unknown> | null = null;
 /** 示範版面基準（供每次示範動畫重設，確保可重複播放）。 */
 let demoBaseline: { slots: CharacterSlots; axis: RotationAxis; laneOrder: SlotIndex[] } | null = null;
 
@@ -179,22 +222,14 @@ function buildDemo(): { slots: CharacterSlots; axis: RotationAxis } {
 function injectDemo(): void {
   const rotationStore = useRotationStore();
   const characterStore = useCharacterStore();
-  const templateStore = useTemplateStore();
   const { laneOrder } = useLaneOrder();
-  const hotkeyMap = useHotkeyMap();
 
-  snapshot = {
-    slots: deepClone(characterStore.slots),
-    axes: deepClone(rotationStore.axes),
-    activeAxisId: rotationStore.activeAxisId,
-    laneOrder: deepClone(laneOrder.value),
-    templates: deepClone(templateStore.templates),
-    history: useHistory().snapshotStacks(),
-    hotkeyEntries: variant === 'hotkey' ? deepClone(hotkeyMap.entries.value) : null,
-    introEntries: variant === 'hotkey' ? deepClone(hotkeyMap.introEntries.value) : null,
-  };
+  // 系統化快照：逐一擷取登記表中每個切片（新增狀態只要註冊即自動涵蓋）。
+  snapshot = {};
+  for (const slice of buildRestorableSlices()) snapshot[slice.name] = slice.capture();
+
   // 熱鍵導覽：示範按鍵（E/Q/R/左鍵長按/長按2）須與旁白一致 → 暫換預設種子表。
-  if (variant === 'hotkey') hotkeyMap.resetToDefaults();
+  if (variant === 'hotkey') useHotkeyMap().resetToDefaults();
 
   const { slots, axis } = buildDemo();
   demoBaseline = { slots: deepClone(slots), axis: deepClone(axis), laneOrder: [0, 1, 2] };
@@ -244,20 +279,13 @@ function resetDemoBoard(): void {
 function restore(): void {
   if (!snapshot) return;
   const rotationStore = useRotationStore();
-  const characterStore = useCharacterStore();
-  const templateStore = useTemplateStore();
-  const { laneOrder } = useLaneOrder();
 
-  characterStore.slots = deepClone(snapshot.slots);
-  rotationStore.axes = deepClone(snapshot.axes);
-  rotationStore.activeAxisId = snapshot.activeAxisId;
-  laneOrder.value = deepClone(snapshot.laneOrder);
-  templateStore.templates = deepClone(snapshot.templates);
-  // 熱鍵導覽變體：還原使用者自己的對映表（示範期間暫換過預設種子）。
-  if (snapshot.hotkeyEntries) useHotkeyMap().entries.value = deepClone(snapshot.hotkeyEntries);
-  if (snapshot.introEntries) useHotkeyMap().introEntries.value = deepClone(snapshot.introEntries);
-  // 還原 undo/redo 佇列，清掉示範真實動作造成的歷史污染。
-  useHistory().restoreStacks(snapshot.history);
+  // 系統化還原：逐一把登記表切片指派回原處（涵蓋角色槽/軸/泳道順序/模板/
+  // undo-redo 佇列/熱鍵對映表）。順序與 capture 一致，彼此獨立無耦合。
+  const captured = snapshot;
+  for (const slice of buildRestorableSlices()) {
+    if (slice.name in captured) slice.restore(captured[slice.name]);
+  }
   rotationStore.clearSelection();
   rotationStore.stopEditing();
   snapshot = null;
