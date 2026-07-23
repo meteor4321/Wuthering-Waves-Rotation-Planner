@@ -39,6 +39,7 @@ import {
   removeHotkeyLaneProxy,
 } from '@/composables/state/useTourDemo';
 import { useHotkeyInputMode } from '@/composables/state/useHotkeyInputMode';
+import { suspendPersistence, resumePersistence } from '@/composables/state/persistenceGuard';
 import { computeCenterScrollLeft } from '@/composables/board/useBoardScroll';
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap';
 import type { HotkeyMapEntry, IntroHotkeyEntry } from '@/types/hotkey';
@@ -452,6 +453,9 @@ function handleDestroyed(): void {
     removeHotkeyLaneProxy();
   }
   restore();
+  // 還原真值已指派回各 ref → 恢復持久化：該指派觸發的 deep watch 會於下一輪
+  // 以「真值 + 已恢復寫入」重新寫檔，localStorage 與記憶體重新一致。
+  resumePersistence();
   // 還原導覽開始前的側邊欄收合狀態。
   useSidebarCollapse().collapsed.value = sidebarWasCollapsed;
   isActive.value = false;
@@ -473,6 +477,10 @@ export function useSpotlightTour() {
     // 使用者最多感覺到首次開導覽的極短延遲（chunk 通常已被瀏覽器快取）。
     const { driver } = await import('driver.js');
     await import('driver.js/dist/driver.css');
+
+    // 暫停持久化：接下來注入示範資料會覆蓋模板庫／熱鍵對映表，若寫檔則污染
+    // 使用者真實資料；handleDestroyed 於 restore 還原真值後才 resume（見 persistenceGuard）。
+    suspendPersistence();
 
     // 熱鍵導覽：若使用者已在模式中（首次進入觸發路徑）先退出，
     // 讓 hk1 的示範統一走「主動進入模式」的乾淨路徑。
