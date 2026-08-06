@@ -273,6 +273,22 @@
     "stepHk2Title": "ホットキーマップ",
     "stepHk2Desc": "各キーに対応するブロックの文字と押し方をカスタマイズします。"
   },
+  "backup": {
+    "title": "データのバックアップと復元",
+    "close": "バックアップ画面を閉じる",
+    "description": "ブラウザーや端末を変更する前、またはデータを削除する前に、先にバックアップをダウンロードし、ここから復元してください。",
+    "exportTitle": "データをエクスポート",
+    "exportDescription": "チーム、テンプレートライブラリ、関連設定が JSON ファイルに保存されます。",
+    "export": "バックアップをダウンロード",
+    "exported": "バックアップをダウンロードしました",
+    "restoreTitle": "データを復元",
+    "chooseFile": "バックアップファイルを選択",
+    "restore": "復元して再読み込み",
+    "restoreConfirmTitle": "データを復元しますか？",
+    "restoreConfirmMessage": "これは、このウェブサイトに現在保存されているデータを「上書き」します。保持したい場合は、先にバックアップをダウンロードしてください。",
+    "restoreConfirmHighlight": "上書き",
+    "restoreFailed": "このバックアップファイルを復元できません。"
+  },
   "dialog": {
     "ok": "OK",
     "cancel": "キャンセル"

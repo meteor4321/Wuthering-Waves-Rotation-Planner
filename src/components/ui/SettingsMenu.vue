@@ -24,6 +24,7 @@ import {
 } from '@/composables/state/useSettings'
 import { useDialog } from '@/composables/state/useDialog'
 import { useHotkeyMapDialog } from '@/composables/state/useHotkeyMapDialog'
+import { useDataBackupDialog } from '@/composables/state/useDataBackupDialog'
 import { useHotkeyMap } from '@/composables/state/useHotkeyMap'
 import { useTemplateStore } from '@/stores/useTemplateStore'
 import { useGeneralBlockStore } from '@/stores/useGeneralBlockStore'
@@ -54,12 +55,18 @@ function stepNumber(key: NumericSettingKey, dir: number): void {
 }
 const dialog = useDialog()
 const hotkeyMapDialog = useHotkeyMapDialog()
+const dataBackupDialog = useDataBackupDialog()
 const hotkeyMap = useHotkeyMap()
 const templateStore = useTemplateStore()
 
 // 開啟熱鍵對映表編輯視窗（順手收合設定面板，避免兩層浮層疊在一起）。
 function openHotkeyMap(): void {
   hotkeyMapDialog.open()
+  isOpen.value = false
+}
+
+function openDataBackup(): void {
+  dataBackupDialog.open()
   isOpen.value = false
 }
 const generalBlockStore = useGeneralBlockStore()
@@ -372,6 +379,15 @@ async function handleClearData(): Promise<void> {
         <!-- ── 區段：資料（危險操作） ── -->
         <section class="settings-menu__section settings-menu__section--danger">
           <h3 class="settings-menu__section-title">{{ $t('settings.section.data') }}</h3>
+
+          <div class="settings-menu__row settings-menu__row--column">
+            <span class="settings-menu__label">
+              {{ $t('backup.title') }}
+            </span>
+            <button type="button" class="settings-menu__link-btn" @click="openDataBackup">
+              {{ $t('backup.title') }}
+            </button>
+          </div>
 
           <!-- 清除資料（危險操作） -->
           <div class="settings-menu__row settings-menu__row--column">

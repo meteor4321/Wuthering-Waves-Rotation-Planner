@@ -277,6 +277,22 @@
     "ok": "OK",
     "cancel": "Cancel"
   },
+  "backup": {
+    "title": "Data Backup & Restore",
+    "close": "Close backup dialog",
+    "description": "Before changing browsers or devices, or clearing data, download a backup first and restore it here.",
+    "exportTitle": "Export data",
+    "exportDescription": "Teams, template library, and related settings will be stored in a JSON file.",
+    "export": "Download backup",
+    "exported": "Backup downloaded",
+    "restoreTitle": "Restore data",
+    "chooseFile": "Choose backup file",
+    "restore": "Restore and reload",
+    "restoreConfirmTitle": "Restore data?",
+    "restoreConfirmMessage": "This will overwrite the data currently stored on this website. Download a backup first if you want to keep it.",
+    "restoreConfirmHighlight": "overwrite",
+    "restoreFailed": "Could not restore this backup file."
+  },
   "toast": {
     "exportedPng": "Image exported",
     "exportedSvg": "SVG exported",

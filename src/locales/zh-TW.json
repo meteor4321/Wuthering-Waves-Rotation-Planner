@@ -277,6 +277,22 @@
     "ok": "確定",
     "cancel": "取消"
   },
+  "backup": {
+    "title": "資料備份與還原",
+    "close": "關閉備份視窗",
+    "description": "更換瀏覽器、裝置或清除資料前，請先下載備份，並由此處還原。",
+    "exportTitle": "匯出資料",
+    "exportDescription": "隊伍、模板庫與相關設定檔將儲存在 JSON 檔案中。",
+    "export": "下載備份",
+    "exported": "備份已下載",
+    "restoreTitle": "還原資料",
+    "chooseFile": "選擇備份檔案",
+    "restore": "還原並重新載入",
+    "restoreConfirmTitle": "要還原資料嗎？",
+    "restoreConfirmMessage": "這會「覆寫」目前儲存在此網站的資料。若要保留它，請先下載備份。",
+    "restoreConfirmHighlight": "覆寫",
+    "restoreFailed": "無法還原這份備份檔案。"
+  },
   "toast": {
     "exportedPng": "已匯出圖片",
     "exportedSvg": "已匯出 SVG",
