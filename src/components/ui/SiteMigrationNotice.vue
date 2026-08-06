@@ -39,7 +39,7 @@ const { isLegacyHost, isInitialDialogOpen, closeInitialDialog, goToNewSite } = u
 .migration-dialog__actions, .migration-reminder__actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 .migration-button, .migration-reminder__link { border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; padding: .42rem .75rem; background: #131b2e; color: rgba(240, 244, 248, .78); font: inherit; font-size: .75rem; cursor: pointer; }
 .migration-button--primary, .migration-reminder__link--primary { border-color: rgba(34, 211, 238, .5); color: rgba(34, 211, 238, .98); }
-.migration-reminder { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 9998; width: min(calc(100vw - 2rem), 22rem); padding: .875rem; border: 1px solid rgba(245, 166, 35, .42); border-radius: 4px; background: #1b2740; box-shadow: 0 8px 24px rgba(0, 0, 0, .48); font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', ui-monospace, monospace); }
+.migration-reminder { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 100; width: min(calc(100vw - 2rem), 22rem); padding: .875rem; border: 1px solid rgba(245, 166, 35, .42); border-radius: 4px; background: #1b2740; box-shadow: 0 8px 24px rgba(0, 0, 0, .48); font-family: var(--app-font-mono, 'JetBrains Mono', 'Fira Code', ui-monospace, monospace); }
 .migration-reminder__title { margin: 0 0 .4rem; color: #f5a623; font-size: .8125rem; font-weight: 700; }
 .migration-reminder__actions { margin-top: .75rem; }
 .migration-reminder__link { padding: .3rem .5rem; background: transparent; }
