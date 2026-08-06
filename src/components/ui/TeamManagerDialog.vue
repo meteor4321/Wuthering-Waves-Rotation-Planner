@@ -249,6 +249,9 @@ const dragOptions = computed(
     // 置頂項不可作為拖曳來源（其把手另以樣式呈現禁用灰）。
     filter: '.team-row--pinned',
     animation: 150,
+    chosenClass: 'team-row--dragging',
+    forceFallback: true,
+    fallbackOnBody: true,
     // 阻止未置頂項被拖入置頂區段（置頂永遠在最上）。
     onMove: (evt: { related: HTMLElement }) =>
       !evt.related.classList.contains('team-row--pinned'),
