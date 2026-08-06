@@ -249,12 +249,18 @@ const dragOptions = computed(
     // 置頂項不可作為拖曳來源（其把手另以樣式呈現禁用灰）。
     filter: '.team-row--pinned',
     animation: 150,
-    chosenClass: 'team-row--dragging',
     forceFallback: true,
     fallbackOnBody: true,
-    // 阻止未置頂項被拖入置頂區段（置頂永遠在最上）。
-    onMove: (evt: { related: HTMLElement }) =>
-      !evt.related.classList.contains('team-row--pinned'),
+    // 阻止未置頂項被拖入置頂區段（置頂永遠在最上），且僅在游標越過目標項目的水平中線後換位。
+    onMove: (evt: { related: HTMLElement; originalEvent?: { clientY?: number } }) => {
+      if (evt.related.classList.contains('team-row--pinned')) return false
+
+      const cursorY = evt.originalEvent?.clientY
+      if (cursorY == null) return false
+
+      const rect = evt.related.getBoundingClientRect()
+      return cursorY < rect.top + rect.height / 2 ? -1 : 1
+    },
     onEnd: handleReorderEnd,
   })
 )
@@ -645,6 +651,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
+.team-row:not(.team-row--editing) {
+  border-color: rgba(192, 198, 208, 0.24);
+}
 .team-row:hover {
   background: rgba(34, 211, 238, 0.06);
   border-color: rgba(34, 211, 238, 0.3);
@@ -677,9 +686,15 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
   pointer-events: none;
 }
-/* 拖曳中的浮動分身（SortableJS 掛於清單容器）。 */
-.team-list :deep(.sortable-ghost) { opacity: 0.4; }
-.team-list :deep(.sortable-drag) { opacity: 0.95; }
+/* 拖曳時只顯示浮動分身；原始項目作為占位但不顯示。 */
+.team-list :deep(.sortable-ghost) { visibility: hidden; }
+.team-list :deep(.sortable-drag) { opacity: 1 !important; }
+.team-list :deep(.sortable-chosen) { opacity: 1 !important; }
+.team-list :deep(.sortable-chosen > *) {
+  transform: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
 .team-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .team-row__name-line { display: flex; align-items: center; gap: 0.35rem; }
 .team-row__pin { font-size: 0.75rem; }
