@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 
-const SITE = 'https://wuthering-waves-rotation-planner.vercel.app';
+const SITE = 'https://www.wuwa-rotation.com';
 
 function readLocaleSeo(file) {
   const json = JSON.parse(readFileSync(new URL(`../src/locales/${file}`, import.meta.url), 'utf8'));

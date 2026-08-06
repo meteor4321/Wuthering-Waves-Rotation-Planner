@@ -36,7 +36,7 @@
 
 ## Live Demo
 
-**[wuthering-waves-rotation-planner.vercel.app](https://wuthering-waves-rotation-planner.vercel.app/)**
+**[wuwa-rotation.com](https://www.wuwa-rotation.com/)**
 
 ### Feature Overview
 
