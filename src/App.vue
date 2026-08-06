@@ -8,6 +8,7 @@ import ExportDialog from '@/components/ui/ExportDialog.vue'
 import TeamManagerDialog from '@/components/ui/TeamManagerDialog.vue'
 import HelpDialog from '@/components/ui/HelpDialog.vue'
 import HotkeyMapDialog from '@/components/ui/HotkeyMapDialog.vue'
+import DataBackupDialog from '@/components/ui/DataBackupDialog.vue'
 import SettingsMenu from '@/components/ui/SettingsMenu.vue'
 import SidebarPanel from '@/components/sidebar/SidebarPanel.vue'
 import RotationBoard from '@/components/rotation/RotationBoard.vue'
@@ -211,6 +212,7 @@ function clearAllSelection(): void {
     <TeamManagerDialog />
     <HelpDialog />
     <HotkeyMapDialog />
+    <DataBackupDialog />
 
     <!-- 離螢幕匯出舞台:平時不渲染任何軸,匯出時才暫時掛上要輸出的軸供截圖。
          合併多軸時,export-merge-wrap 內縱向堆疊多個視圖,整塊截一張。 -->

@@ -10,12 +10,24 @@
 //   - 點擊遮罩 = 取消
 // ============================================================
 
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDialog } from '@/composables/state/useDialog'
 
 const { state, handleConfirm, handleCancel } = useDialog()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+
+/** 將確認文字拆成一般與警示片段，避免直接渲染翻譯中的 HTML。 */
+const messageParts = computed(() => {
+  const { message, messageHighlight } = state.value
+  const index = messageHighlight ? message.indexOf(messageHighlight) : -1
+  if (index < 0) return [{ text: message, isHighlight: false }]
+  return [
+    { text: message.slice(0, index), isHighlight: false },
+    { text: messageHighlight, isHighlight: true },
+    { text: message.slice(index + messageHighlight.length), isHighlight: false },
+  ].filter((part) => part.text)
+})
 
 // 開啟且為 prompt 時，下一個 tick 自動聚焦並選取輸入框內容。
 watch(
@@ -46,7 +58,9 @@ watch(
           @keydown.esc.prevent="handleCancel"
         >
           <h2 v-if="state.title" class="dialog__title">{{ state.title }}</h2>
-          <p v-if="state.message" class="dialog__message">{{ state.message }}</p>
+          <p v-if="state.message" class="dialog__message">
+            <span v-for="(part, index) in messageParts" :key="index" :class="{ 'dialog__message-highlight': part.isHighlight }">{{ part.text }}</span>
+          </p>
 
           <input
             v-if="state.kind === 'prompt'"
@@ -120,6 +134,11 @@ watch(
   font-size: 0.8125rem;
   line-height: 1.5;
   color: rgba(240, 244, 248, 0.82);
+}
+
+.dialog__message-highlight {
+  color: rgba(248, 113, 113, 0.95);
+  font-weight: 700;
 }
 
 .dialog__input {

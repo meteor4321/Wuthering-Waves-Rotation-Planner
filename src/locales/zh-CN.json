@@ -273,6 +273,22 @@
     "stepHk2Title": "热键映射表",
     "stepHk2Desc": "自定义每个按键对应的区块文字与按法。"
   },
+  "backup": {
+    "title": "数据备份与还原",
+    "close": "关闭备份窗口",
+    "description": "更换浏览器、设备或清除数据前，请先下载备份，并在此处还原。",
+    "exportTitle": "导出数据",
+    "exportDescription": "队伍、模板库与相关设置将储存在 JSON 文件中。",
+    "export": "下载备份",
+    "exported": "备份已下载",
+    "restoreTitle": "还原数据",
+    "chooseFile": "选择备份文件",
+    "restore": "还原并重新加载",
+    "restoreConfirmTitle": "要还原数据吗？",
+    "restoreConfirmMessage": "这会“覆盖”目前储存在此网站的数据。若要保留，请先下载备份。",
+    "restoreConfirmHighlight": "覆盖",
+    "restoreFailed": "无法还原这份备份文件。"
+  },
   "dialog": {
     "ok": "确定",
     "cancel": "取消"

@@ -16,6 +16,7 @@ type DialogKind = 'confirm' | 'prompt';
 interface ConfirmOptions {
   title?: string;
   message?: string;
+  messageHighlight?: string;
   confirmText?: string;
   cancelText?: string;
   /** 危險操作（如刪除）時把確定鈕標成紅色。 */
@@ -32,6 +33,7 @@ interface DialogState {
   kind: DialogKind;
   title: string;
   message: string;
+  messageHighlight: string;
   inputValue: string;
   placeholder: string;
   confirmText: string;
@@ -45,6 +47,7 @@ const state = ref<DialogState>({
   kind: 'confirm',
   title: '',
   message: '',
+  messageHighlight: '',
   inputValue: '',
   placeholder: '',
   confirmText: '確定',
@@ -61,6 +64,7 @@ export function useDialog() {
         kind: 'confirm',
         title: opts.title ?? '',
         message: opts.message ?? '',
+        messageHighlight: opts.messageHighlight ?? '',
         inputValue: '',
         placeholder: '',
         confirmText: opts.confirmText ?? t('dialog.ok'),
@@ -78,6 +82,7 @@ export function useDialog() {
         kind: 'prompt',
         title: opts.title ?? '',
         message: opts.message ?? '',
+        messageHighlight: opts.messageHighlight ?? '',
         inputValue: opts.defaultValue ?? '',
         placeholder: opts.placeholder ?? '',
         confirmText: opts.confirmText ?? t('dialog.ok'),
