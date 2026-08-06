@@ -293,6 +293,15 @@
     "restoreConfirmHighlight": "覆寫",
     "restoreFailed": "無法還原這份備份檔案。"
   },
+  "migration": {
+    "title": "網站搬遷公告",
+    "message": "本網站已搬遷至 www.wuwa-rotation.com。\n舊站將維持可用，但未來不再更新。\n\n瀏覽器資料會依網域分開儲存。前往新站前，請先在「設定 → 資料備份與還原」下載備份，再到新網站還原資料。",
+    "confirm": "Confirm",
+    "goToNewSite": "前往新網站",
+    "reminderTitle": "網站已搬遷",
+    "reminderMessage": "舊站將不再更新。請先備份資料，再前往新網站。",
+    "learnMore": "查看公告"
+  },
   "toast": {
     "exportedPng": "已匯出圖片",
     "exportedSvg": "已匯出 SVG",

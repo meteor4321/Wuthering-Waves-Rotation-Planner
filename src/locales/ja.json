@@ -293,6 +293,15 @@
     "ok": "OK",
     "cancel": "キャンセル"
   },
+  "migration": {
+    "title": "サイト移転のお知らせ",
+    "message": "このサイトは www.wuwa-rotation.com に移転しました。\n旧サイトは引き続き利用できますが、今後は更新されません。\n\nブラウザのデータはドメインごとに保存されます。移転前に「設定 → データのバックアップと復元」でバックアップをダウンロードし、新サイトで復元してください。",
+    "confirm": "Confirm",
+    "goToNewSite": "新しいサイトへ",
+    "reminderTitle": "サイトは移転しました",
+    "reminderMessage": "旧サイトは今後更新されません。新サイトへ移動する前にデータをバックアップしてください。",
+    "learnMore": "お知らせを見る"
+  },
   "toast": {
     "exportedPng": "画像をエクスポートしました",
     "exportedSvg": "SVGをエクスポートしました",

@@ -293,6 +293,15 @@
     "restoreConfirmHighlight": "overwrite",
     "restoreFailed": "Could not restore this backup file."
   },
+  "migration": {
+    "title": "Website Migration Notice",
+    "message": "This website has moved to www.wuwa-rotation.com.\nThe old site will remain available, but it will no longer receive updates.\n\nBrowser data is stored separately for each domain. Before moving, download a backup in Settings → Data Backup & Restore, then restore it on the new website.",
+    "confirm": "Confirm",
+    "goToNewSite": "Go to new website",
+    "reminderTitle": "This website has moved",
+    "reminderMessage": "The old site will no longer receive updates. Back up your data before moving to the new website.",
+    "learnMore": "View notice"
+  },
   "toast": {
     "exportedPng": "Image exported",
     "exportedSvg": "SVG exported",

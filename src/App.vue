@@ -9,6 +9,7 @@ import TeamManagerDialog from '@/components/ui/TeamManagerDialog.vue'
 import HelpDialog from '@/components/ui/HelpDialog.vue'
 import HotkeyMapDialog from '@/components/ui/HotkeyMapDialog.vue'
 import DataBackupDialog from '@/components/ui/DataBackupDialog.vue'
+import SiteMigrationNotice from '@/components/ui/SiteMigrationNotice.vue'
 import SettingsMenu from '@/components/ui/SettingsMenu.vue'
 import SidebarPanel from '@/components/sidebar/SidebarPanel.vue'
 import RotationBoard from '@/components/rotation/RotationBoard.vue'
@@ -19,6 +20,7 @@ import { useExportDialog } from '@/composables/state/useExportDialog'
 import { useTeamManager } from '@/composables/state/useTeamManager'
 import { useHelpDialog } from '@/composables/state/useHelpDialog'
 import { useSpotlightTour } from '@/composables/state/useSpotlightTour'
+import { useSiteMigrationNotice } from '@/composables/state/useSiteMigrationNotice'
 import { nodeToPngBlob, nodeToSvgBlob, savePng, saveSvg, saveZip } from '@/composables/useImageExport'
 import type { ExportFormat } from '@/composables/state/useExportDialog'
 import { showToast } from '@/composables/state/useToast'
@@ -40,6 +42,7 @@ const exportDialog = useExportDialog()
 const teamManager = useTeamManager()
 const helpDialog = useHelpDialog()
 const tour = useSpotlightTour()
+const siteMigration = useSiteMigrationNotice()
 const { t } = useI18n()
 
 // 排軸內容非持久化，但當前隊伍綁定會保留；重整後把綁定存檔的內容補回工作區，
@@ -47,7 +50,8 @@ const { t } = useI18n()
 savedTeamStore.hydrateCurrentTeam()
 
 // 首訪自動播放功能導覽（僅第一次；之後由使用說明視窗的「重新觀看」重播）。
-onMounted(() => {
+onMounted(async () => {
+  if (siteMigration.isLegacyHost.value) await siteMigration.initialDialogClosed
   if (!tour.hasSeenTour.value) void tour.start()
 })
 
@@ -207,6 +211,7 @@ function clearAllSelection(): void {
     </AppLayout>
 
     <ToastNotification />
+    <SiteMigrationNotice />
     <DialogHost />
     <ExportDialog />
     <TeamManagerDialog />

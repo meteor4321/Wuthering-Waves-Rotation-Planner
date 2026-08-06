@@ -293,6 +293,15 @@
     "ok": "确定",
     "cancel": "取消"
   },
+  "migration": {
+    "title": "网站迁移公告",
+    "message": "本网站已迁移至 www.wuwa-rotation.com。\n旧站将继续可用，但未来不再更新。\n\n浏览器数据会按域名分别存储。前往新站前，请先在「设置 → 数据备份与还原」下载备份，再到新网站还原数据。",
+    "confirm": "Confirm",
+    "goToNewSite": "前往新网站",
+    "reminderTitle": "网站已迁移",
+    "reminderMessage": "旧站将不再更新。请先备份数据，再前往新网站。",
+    "learnMore": "查看公告"
+  },
   "toast": {
     "exportedPng": "已导出图片",
     "exportedSvg": "已导出 SVG",
