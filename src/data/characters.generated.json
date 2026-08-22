@@ -1,5 +1,16 @@
 [
   {
+    "id": "qingxiao",
+    "nameZh": "清宵",
+    "element": "氣動",
+    "rarity": 5,
+    "nameZhCn": "清宵",
+    "nameEn": "Qingxiao",
+    "nameJa": "清宵",
+    "nameKo": "청초",
+    "avatar": "/assets/characters/qingxiao.webp"
+  },
+  {
     "id": "sigrika",
     "nameZh": "西格莉卡",
     "element": "氣動",
@@ -504,6 +515,17 @@
     "nameJa": "今汐",
     "nameKo": "금희",
     "avatar": "/assets/characters/jinhsi.webp"
+  },
+  {
+    "id": "jingran",
+    "nameZh": "景燃",
+    "element": "熱熔",
+    "rarity": 5,
+    "nameZhCn": "景燃",
+    "nameEn": "Jingran",
+    "nameJa": "景燃",
+    "nameKo": "경연",
+    "avatar": "/assets/characters/jingran.webp"
   },
   {
     "id": "denia",
