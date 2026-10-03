@@ -220,6 +220,28 @@
     "avatar": "/assets/characters/sanhua.webp"
   },
   {
+    "id": "suoming",
+    "nameZh": "鎖暝",
+    "element": "導電",
+    "rarity": 5,
+    "nameZhCn": "锁暝",
+    "nameEn": "Suoming",
+    "nameJa": "鎖暝",
+    "nameKo": "쇄명",
+    "avatar": "/assets/characters/suoming.webp"
+  },
+  {
+    "id": "hsin",
+    "nameZh": "心",
+    "element": "導電",
+    "rarity": 5,
+    "nameZhCn": "心",
+    "nameEn": "Hsin",
+    "nameJa": "心",
+    "nameKo": "여우의 별자리",
+    "avatar": "/assets/characters/hsin.webp"
+  },
+  {
     "id": "rover-electro",
     "nameZh": "漂泊者·導電",
     "element": "導電",
