@@ -10,6 +10,7 @@ lerna-debug.log*
 DesignDocument
 
 .claude
+src/.claude
 
 node_modules
 dist

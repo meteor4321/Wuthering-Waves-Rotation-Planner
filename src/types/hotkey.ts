@@ -1,12 +1,12 @@
 // ============================================================
 // hotkey.ts — 熱鍵輸入模式的對映表型別。
 //
-// 設計決策（見 DesignDocument/HotkeyInputMode.md §2）：
+// 設計決策（本機系統頁見 DesignDocument/architecture/rotation/keyboard-input/README.md）：
 //   - 以 label 為準（非模板 id）：命中即插入自由區塊，免處理模板刪改的懸空引用。
 //   - hotkey 一律存 KeyboardEvent.code（物理鍵，免疫 CapsLock／輸入法），
 //     滑鼠鍵則用 'MouseLeft' / 'MouseRight' 兩個保留字。
-//   - pressType 預留 tap/hold；Stage 2 僅用 tap，hold 判定於 Stage 3 接上。
-//   - id 為本專案內部用（列表渲染 key／編輯定位）；非設計文件的三欄之一。
+//   - pressType 分辨單擊 tap 和長按 hold。
+//   - id 為列表渲染與編輯定位的內部鍵。
 // ============================================================
 
 /** 按法：單擊 / 長按。結構預留未來擴充（如 'double'）。 */

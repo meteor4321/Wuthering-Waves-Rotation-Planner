@@ -1,7 +1,7 @@
 // ============================================================
 // i18n/index.ts — 多語系實例與顯示名工具（單一來源）。
 //
-// 兩套系統（見 DesignDocument/維護指南/語言系統維護SOP.md）：
+// 兩套系統（本機維護步驟見 DesignDocument/runbooks/localization.md）：
 //   A. 介面文字：src/locales/<lang>.json 字典，經 t() 查表。
 //   B. 資料名稱：角色/屬性名內嵌多語欄位（nameZh/nameEn，爬蟲供給），
 //      經 characterDisplayName / elementDisplayName 依 locale 切換。
@@ -9,8 +9,7 @@
 // 語言狀態單一來源＝useSettings.language（持久化）；此處 watch 同步到
 // i18n.global.locale（響應式 → 切換即時生效免重整）。缺字 fallback 回 en。
 //
-// 介面字串支援 5 語言：簡中/繁中/英/日/韓。資料名稱（角色/屬性）目前僅備繁中與英文，
-// 日/韓與簡中的資料名於 Part 2（爬蟲補多語欄位）前，暫以英文/繁中優雅回退。
+// 介面與資料名稱支援簡中/繁中/英/日/韓；資料名稱的缺值順序見下方顯示函式。
 // ============================================================
 
 import { createI18n } from 'vue-i18n';

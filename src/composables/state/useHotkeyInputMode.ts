@@ -2,12 +2,12 @@
 // useHotkeyInputMode.ts — 熱鍵輸入模式（module 單例）。
 //
 // 職責：模式開關狀態 ＋ 模式中的鍵盤輸入分派（插入區塊／切泳道／刪除／退出）。
-// 設計決策（見 DesignDocument/HotkeyInputMode.md）：
+// 設計決策（本機系統頁見 DesignDocument/architecture/rotation/keyboard-input/README.md）：
 //   - 對映以 label 為準（非模板 id）：命中即呼叫 addFreeformBlock 插入自由區塊，
 //     不需處理模板刪改的懸空引用。
 //   - 鍵位比對用 event.code（物理鍵），免疫 CapsLock 與輸入法。
 //   - 泳道選中直接重用 rotationStore.selectedLaneIndex（沿用青色焦點環視覺）。
-//   - 對映表改讀 useHotkeyMap（Stage 2：設定頁可編輯、LocalStorage 持久化）。
+//   - 對映表由 useHotkeyMap 提供，設定頁可編輯並寫入 localStorage。
 //   - 模式中既有快捷鍵全數停用：useKeyboardShortcuts 分派器見 active 即短路
 //     改呼叫 handleModeKeydown。
 // ============================================================

@@ -5,7 +5,7 @@
 // 掛載於 App.vue 頂層，透過 Teleport 渲染至 <body>；由 useHotkeyMapDialog 單例
 // 控制開合，內容即時寫入 useHotkeyMap（無「確定 / 取消」的暫存草稿）。
 //
-// 職責（見 DesignDocument/HotkeyInputMode.md §4）：
+// 職責（本機系統頁見 DesignDocument/architecture/rotation/keyboard-input/README.md）：
 //   - 每條條目一列：label 文字欄 + 按鍵擷取欄 + pressType 切換 + 刪除鈕。
 //   - 底部「新增條目」與「還原預設」。
 //   - 錄入時擋保留鍵（RESERVED_CODES）、即時偵測衝突（同 hotkey + pressType）。
@@ -15,11 +15,10 @@
 //     stopImmediatePropagation 擋住全域快捷鍵（否則錄入時按下的鍵會誤觸 App
 //     快捷鍵，如 F 進入熱鍵模式）；contextmenu 一併攔下避免右鍵彈選單。
 //   - 鍵位比對用 event.code；顯示走 formatHotkey。
-//   - 滑鼠鍵擷取（Stage 3）：擷取中按滑鼠左／右鍵即錄入 MouseLeft／MouseRight。
+//   - 擷取中按滑鼠左／右鍵即錄入 MouseLeft／MouseRight。
 //     取消擷取改按 Escape（擷取中的左鍵點擊會被當成 MouseLeft 錄入）。
 //   - 衝突＝同鍵同 pressType 的既有條目：以 dialog.confirm 詢問「覆蓋」
 //     （新條目取得該鍵、原持有者清空鍵位）或「取消」（不變更）。
-//   - 介面字串暫以繁中字面量（沿用 Stage 1 慣例，Stage 4 統一進 i18n）。
 // ============================================================
 
 import { ref, onUnmounted } from 'vue'

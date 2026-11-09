@@ -1,7 +1,7 @@
 // ============================================================
 // hotkeyMap.ts — 熱鍵對映表的預設種子、保留鍵與鍵名格式化。
 //
-// 設計決策（見 DesignDocument/HotkeyInputMode.md §2）：
+// 設計決策（本機系統頁見 DesignDocument/architecture/rotation/keyboard-input/README.md）：
 //   - 種子為固定表 HOTKEY_SEED_SOURCE（已與使用者確認）：label＝插入的區塊文字，
 //     配上預設鍵與按法（含滑鼠左鍵單擊/長按並存、Space、KeyF 等）。
 //   - 保留鍵禁止綁定：模式已徵用（Esc/1-2-3/Delete/Backspace）、修飾鍵本身（Ctrl/Meta）。

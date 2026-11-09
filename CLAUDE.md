@@ -1,3 +1,11 @@
+## 任務開始前
+
+**每次接到本專案的任務，第一步先完整閱讀並遵守根目錄的 [Rule.md](Rule.md)。** 回答、查找、規劃、審查、修改與驗證都適用。
+
+有本機 [設計文件入口](DesignDocument/README.md) 時，依任務定位系統，再核對原始碼。缺少本機設計文件時，從 [README.md](README.md)、[package.json](package.json) 與原始碼查起。
+
+任務驗收後，依 [Rule.md](Rule.md#驗收後維護索引) 的檔案對照表主動維護受影響的索引，並在交付前走查。
+
 <!-- code-review-graph MCP tools -->
 ## Before Implementing
 
