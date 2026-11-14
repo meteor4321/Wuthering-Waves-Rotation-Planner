@@ -440,6 +440,17 @@
     "avatar": "/assets/characters/taoqi.webp"
   },
   {
+    "id": "lily",
+    "nameZh": "莉莉",
+    "element": "衍射",
+    "rarity": 5,
+    "nameZhCn": "莉莉",
+    "nameEn": "Lily",
+    "nameJa": "リリー",
+    "nameKo": "릴리",
+    "avatar": "/assets/characters/lily.webp"
+  },
+  {
     "id": "lucy",
     "nameZh": "露西",
     "element": "衍射",
